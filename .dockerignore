@@ -1,0 +1,17 @@
+.git
+.github
+data
+.env
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/dist
+**/*.db
+**/.DS_Store
+backend/.venv
+frontend/node_modules
+frontend/dist
+README.md
+*.md

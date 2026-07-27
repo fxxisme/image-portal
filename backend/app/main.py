@@ -3,10 +3,13 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import admin, auth, conversations, images
+from app.routers import admin, auth, conversations, gallery, images
+from app.services.media import media_root
 
 logging.basicConfig(level=logging.INFO)
 settings = get_settings()
@@ -36,6 +39,11 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(conversations.router)
 app.include_router(images.router)
+app.include_router(gallery.router)
+
+# 用户生成图持久化目录（本地/容器均挂载）
+_media = media_root()
+app.mount("/media", StaticFiles(directory=str(_media)), name="media")
 
 
 @app.on_event("startup")
@@ -55,3 +63,51 @@ def on_startup() -> None:
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True}
+
+
+def _mount_frontend() -> None:
+    """单容器生产：托管 Vite 构建产物；本地开发不设 STATIC_DIR。"""
+    raw = (settings.static_dir or "").strip()
+    if not raw:
+        return
+    static_root = Path(raw).resolve()
+    if not static_root.is_dir():
+        logging.warning("STATIC_DIR 不存在，跳过静态托管: %s", static_root)
+        return
+
+    assets = static_root / "assets"
+    if assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets)), name="assets")
+
+    @app.get("/")
+    async def index() -> FileResponse:
+        return FileResponse(static_root / "index.html")
+
+    @app.get("/{full_path:path}")
+    async def spa(full_path: str) -> FileResponse:
+        # API / 媒体 / 文档未命中时不要回 SPA
+        if (
+            full_path == "api"
+            or full_path.startswith("api/")
+            or full_path == "media"
+            or full_path.startswith("media/")
+            or full_path in {
+                "docs",
+                "redoc",
+                "openapi.json",
+            }
+        ):
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="Not Found")
+        candidate = (static_root / full_path).resolve()
+        try:
+            candidate.relative_to(static_root)
+        except ValueError:
+            return FileResponse(static_root / "index.html")
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(static_root / "index.html")
+
+
+_mount_frontend()

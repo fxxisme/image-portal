@@ -7,6 +7,7 @@ from app.auth import get_current_api_key
 from app.database import get_db
 from app.models import ApiKey, Conversation, Message, UsageLog
 from app.schemas import EditRequest, GenerateRequest, GenerateResponse
+from app.services.media import persist_generated_images
 from app.services.messages import dump_urls, message_to_out
 from app.services.settings import get_or_create_settings
 from app.services.upstream import UpstreamError, images_edits, images_generations
@@ -93,6 +94,19 @@ async def generate(
         model=model,
     )
     db.add(assistant)
+    db.flush()
+
+    stored = await persist_generated_images(
+        db,
+        api_key_id=api_key.id,
+        conversation_id=conv.id,
+        message_id=assistant.id,
+        action="generate",
+        prompt=body.prompt,
+        urls=urls,
+    )
+    assistant.image_urls = dump_urls(stored)
+
     db.add(
         UsageLog(
             api_key_id=api_key.id,
@@ -178,6 +192,19 @@ async def edit(
         model=model,
     )
     db.add(assistant)
+    db.flush()
+
+    stored = await persist_generated_images(
+        db,
+        api_key_id=api_key.id,
+        conversation_id=conv.id,
+        message_id=assistant.id,
+        action="edit",
+        prompt=body.prompt,
+        urls=urls,
+    )
+    assistant.image_urls = dump_urls(stored)
+
     db.add(
         UsageLog(
             api_key_id=api_key.id,

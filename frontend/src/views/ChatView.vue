@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { request } from "../api/http";
+import GalleryModal from "../components/GalleryModal.vue";
 import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();
@@ -12,17 +13,28 @@ const currentId = ref(null);
 const messages = ref([]);
 const prompt = ref("");
 const n = ref(1);
-const model = ref("");
-const loadingList = ref(false);
 const loadingChat = ref(false);
 const sending = ref(false);
 const error = ref("");
-const editTargetUrl = ref("");
+/** 改图参考：远程 URL 或 data URL */
+const editImageSrc = ref("");
+const editPreview = ref("");
+const fileInput = ref(null);
 const scroller = ref(null);
+const galleryOpen = ref(false);
 
 const currentTitle = computed(() => {
   const c = conversations.value.find((x) => x.id === currentId.value);
   return c?.title || "对话生图";
+});
+
+const isEditMode = computed(() => !!editImageSrc.value);
+
+const quotaText = computed(() => {
+  const rem = auth.me?.quota_remaining;
+  const total = auth.me?.quota_total;
+  if (rem == null || total == null) return "额度加载中…";
+  return `已用 ${auth.me.quota_used ?? total - rem} / 共 ${total} 张 · 剩余 ${rem} 张`;
 });
 
 async function ensureMe() {
@@ -37,7 +49,6 @@ async function ensureMe() {
 }
 
 async function loadConversations() {
-  loadingList.value = true;
   try {
     conversations.value = await request("/api/conversations", { token: auth.userToken });
     if (!currentId.value && conversations.value.length) {
@@ -49,8 +60,6 @@ async function loadConversations() {
       auth.logoutUser();
       router.push({ name: "login" });
     }
-  } finally {
-    loadingList.value = false;
   }
 }
 
@@ -86,7 +95,7 @@ async function createConversation() {
     conversations.value.unshift(item);
     currentId.value = item.id;
     messages.value = [];
-    editTargetUrl.value = "";
+    clearEditImage();
   } catch (e) {
     error.value = e.message || String(e);
   }
@@ -110,15 +119,48 @@ async function removeConversation(id) {
 
 function selectConversation(id) {
   currentId.value = id;
-  editTargetUrl.value = "";
+  clearEditImage();
 }
 
 function useAsEditRef(url) {
-  editTargetUrl.value = url;
+  editImageSrc.value = url;
+  editPreview.value = url;
+  galleryOpen.value = false;
 }
 
-function clearEditRef() {
-  editTargetUrl.value = "";
+function clearEditImage() {
+  editImageSrc.value = "";
+  editPreview.value = "";
+  if (fileInput.value) fileInput.value.value = "";
+}
+
+function pickFile() {
+  fileInput.value?.click();
+}
+
+function onFileChange(ev) {
+  const file = ev.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    error.value = "请上传图片文件";
+    return;
+  }
+  // 约 8MB 限制，避免 body 过大
+  if (file.size > 8 * 1024 * 1024) {
+    error.value = "图片请小于 8MB";
+    return;
+  }
+  error.value = "";
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = String(reader.result || "");
+    editImageSrc.value = dataUrl;
+    editPreview.value = dataUrl;
+  };
+  reader.onerror = () => {
+    error.value = "读取图片失败";
+  };
+  reader.readAsDataURL(file);
 }
 
 function scrollBottom() {
@@ -141,15 +183,14 @@ async function send() {
     prompt: text,
     n: Number(n.value) || 1,
   };
-  if (model.value.trim()) bodyBase.model = model.value.trim();
 
   try {
     let data;
-    if (editTargetUrl.value) {
+    if (editImageSrc.value) {
       data = await request("/api/edit", {
         method: "POST",
         token: auth.userToken,
-        body: { ...bodyBase, image_url: editTargetUrl.value },
+        body: { ...bodyBase, image_url: editImageSrc.value },
       });
     } else {
       data = await request("/api/generate", {
@@ -163,9 +204,8 @@ async function send() {
     auth.setQuotaRemaining(data.quota_remaining);
     if (auth.me) auth.me.quota_used = (auth.me.quota_total || 0) - data.quota_remaining;
     prompt.value = "";
-    // 多轮默认以上一轮结果为下一轮参考
-    const lastUrls = data.assistant_message?.image_urls || [];
-    editTargetUrl.value = lastUrls[0] || "";
+    // 提交后退出改图附件，避免误连发；可再点「基于此图修改」
+    clearEditImage();
     await loadConversations();
     await nextTick();
     scrollBottom();
@@ -226,37 +266,38 @@ onMounted(async () => {
       <header class="bar">
         <div>
           <div class="title">{{ currentTitle }}</div>
-          <div class="muted sub">
-            文生图 / 多轮改图 · 上游
-            <span class="mono">/v1/images/generations|edits</span>
-          </div>
+          <div class="muted sub">{{ quotaText }}</div>
         </div>
         <div class="row">
-          <span class="badge">
-            剩余
-            <strong>{{ auth.me?.quota_remaining ?? "-" }}</strong>
-            / {{ auth.me?.quota_total ?? "-" }} 张
+          <button class="ghost" type="button" @click="galleryOpen = true">我的图库</button>
+          <span class="badge remain">
+            剩余 <strong>{{ auth.me?.quota_remaining ?? "-" }}</strong> 张
           </span>
           <span class="badge" v-if="auth.me?.name">{{ auth.me.name }}</span>
           <button class="ghost" type="button" @click="logout">退出</button>
         </div>
       </header>
 
+      <GalleryModal
+        :open="galleryOpen"
+        @close="galleryOpen = false"
+        @use-edit="useAsEditRef"
+      />
+
       <div v-if="error" class="err ban">{{ error }}</div>
 
       <div ref="scroller" class="messages">
         <div v-if="loadingChat" class="muted center">加载中…</div>
         <div v-else-if="!messages.length" class="muted center tip">
-          输入描述生成图片。点「基于此图修改」可进入多轮改图，每张成功出图都会扣额度。
+          输入描述即可生图；上传图片或点「基于此图修改」可改图。成功出图会扣额度。
         </div>
 
         <div v-for="m in messages" :key="m.id" class="msg" :class="m.role">
           <div class="bubble">
             <div class="role">{{ m.role === "user" ? "你" : "助手" }}</div>
             <div class="content">{{ m.content }}</div>
-            <div v-if="m.ref_image_url && m.role === 'user'" class="ref muted">
-              参考图：
-              <a :href="m.ref_image_url" target="_blank" rel="noopener">打开</a>
+            <div v-if="m.ref_image_url && m.role === 'user'" class="ref-thumb">
+              <img :src="m.ref_image_url" alt="参考图" />
             </div>
             <div v-if="m.image_urls?.length" class="imgs">
               <div v-for="(url, idx) in m.image_urls" :key="idx" class="img-card">
@@ -265,57 +306,65 @@ onMounted(async () => {
                 </a>
                 <div class="img-actions">
                   <button class="success" type="button" @click="useAsEditRef(url)">基于此图修改</button>
-                  <a class="link" :href="url" target="_blank" rel="noopener">原图</a>
+                  <a class="link" :href="url" target="_blank" rel="noopener">查看原图</a>
                 </div>
               </div>
             </div>
-            <div v-if="m.cost" class="meta muted">消耗 {{ m.cost }} 张 · {{ m.model || "" }}</div>
+            <div v-if="m.cost" class="meta muted">消耗 {{ m.cost }} 张</div>
           </div>
         </div>
       </div>
 
       <footer class="composer card">
-        <div v-if="editTargetUrl" class="edit-banner">
+        <div v-if="isEditMode" class="edit-banner">
           <div class="edit-info">
-            <strong>改图模式</strong>
-            <span class="muted">将调用 /v1/images/edits</span>
-            <a :href="editTargetUrl" target="_blank" rel="noopener">查看参考图</a>
+            <img v-if="editPreview" class="edit-thumb" :src="editPreview" alt="参考" />
+            <div>
+              <strong>改图模式</strong>
+              <div class="muted tiny">将根据参考图与文字说明生成</div>
+            </div>
           </div>
-          <button class="ghost" type="button" @click="clearEditRef">取消改图</button>
+          <button class="ghost" type="button" @click="clearEditImage">移除图片</button>
         </div>
 
-        <textarea
-          v-model="prompt"
-          :placeholder="editTargetUrl ? '描述如何修改这张图…' : '描述你想生成的图片…'"
-          @keydown.enter.exact.prevent="send"
-        />
+        <div class="input-row">
+          <button class="ghost attach" type="button" title="上传参考图" @click="pickFile">
+            图片
+          </button>
+          <input
+            ref="fileInput"
+            type="file"
+            accept="image/*"
+            class="hidden-file"
+            @change="onFileChange"
+          />
+          <textarea
+            v-model="prompt"
+            :placeholder="isEditMode ? '描述如何修改这张图…' : '描述你想生成的图片…'"
+            @keydown.enter.exact.prevent="send"
+          />
+        </div>
 
         <div class="composer-bar">
-          <div class="row controls">
-            <label class="mini">
-              张数
-              <select v-model.number="n">
-                <option :value="1">1</option>
-                <option :value="2">2</option>
-                <option :value="3">3</option>
-                <option :value="4">4</option>
-              </select>
-            </label>
-            <label class="mini grow">
-              模型（可空=默认）
-              <input v-model="model" placeholder="gpt-image-2" />
-            </label>
-          </div>
+          <label class="mini">
+            张数
+            <select v-model.number="n">
+              <option :value="1">1</option>
+              <option :value="2">2</option>
+              <option :value="3">3</option>
+              <option :value="4">4</option>
+            </select>
+          </label>
           <button
             class="primary"
             type="button"
             :disabled="sending || !prompt.trim()"
             @click="send"
           >
-            {{ sending ? "生成中…" : editTargetUrl ? "提交改图" : "生成" }}
+            {{ sending ? "处理中…" : isEditMode ? "提交改图" : "生成" }}
           </button>
         </div>
-        <div class="muted hint">生图可能需要 30 秒～数分钟。失败不扣额度。</div>
+        <div class="muted hint">生成可能需要一些时间。失败不扣额度。</div>
       </footer>
     </main>
   </div>
@@ -419,6 +468,9 @@ onMounted(async () => {
   font-size: 12px;
   margin-top: 2px;
 }
+.remain strong {
+  color: var(--accent-2);
+}
 .ban {
   margin: 12px 18px 0;
 }
@@ -466,9 +518,15 @@ onMounted(async () => {
   word-break: break-word;
   line-height: 1.5;
 }
-.ref {
+.ref-thumb {
   margin-top: 8px;
-  font-size: 12px;
+}
+.ref-thumb img {
+  max-width: 120px;
+  max-height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
 }
 .imgs {
   margin-top: 12px;
@@ -514,10 +572,39 @@ onMounted(async () => {
 }
 .edit-info {
   display: flex;
-  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   font-size: 13px;
+  min-width: 0;
+}
+.edit-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tiny {
+  font-size: 12px;
+  margin-top: 2px;
+}
+.input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.attach {
+  flex-shrink: 0;
+  align-self: flex-end;
+  min-width: 56px;
+}
+.input-row textarea {
+  flex: 1;
+  min-height: 72px;
+}
+.hidden-file {
+  display: none;
 }
 .composer-bar {
   display: flex;
@@ -526,21 +613,13 @@ onMounted(async () => {
   align-items: end;
   margin-top: 10px;
 }
-.controls {
-  flex: 1;
-}
 .mini {
   display: grid;
   gap: 4px;
   font-size: 12px;
   color: var(--muted);
 }
-.mini.grow {
-  flex: 1;
-  min-width: 160px;
-}
-.mini select,
-.mini input {
+.mini select {
   min-width: 72px;
 }
 .hint {

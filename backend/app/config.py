@@ -11,8 +11,14 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
-    # SQLite 路径（Docker 挂载 /data）
-    database_url: str = "sqlite:////data/portal.db"
+    # SQLite；本地默认当前目录；Docker 用环境变量指到 /data
+    database_url: str = "sqlite:///./portal.db"
+
+    # 前端静态目录（Docker 单容器为 /app/static；本地开发留空则不托管）
+    static_dir: str = ""
+
+    # 用户生成图本地持久化目录（相对 cwd 或绝对路径）
+    media_dir: str = "./media"
 
     # 管理端单口令（仅此与 JWT 仍走环境变量）
     admin_password: str = "change-me-admin"

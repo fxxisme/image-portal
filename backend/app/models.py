@@ -27,6 +27,7 @@ class ApiKey(Base):
 
     conversations: Mapped[list["Conversation"]] = relationship(back_populates="api_key")
     usage_logs: Mapped[list["UsageLog"]] = relationship(back_populates="api_key")
+    generated_images: Mapped[list["GeneratedImage"]] = relationship(back_populates="api_key")
 
     @property
     def quota_remaining(self) -> int:
@@ -102,3 +103,25 @@ class SystemSetting(Base):
     default_model: Mapped[str] = mapped_column(String(128), nullable=False, default="gpt-image-2")
     response_format: Mapped[str] = mapped_column(String(32), nullable=False, default="url")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class GeneratedImage(Base):
+    """用户（秘钥）生成图本地持久化记录。"""
+
+    __tablename__ = "generated_images"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    api_key_id: Mapped[int] = mapped_column(ForeignKey("api_keys.id", ondelete="CASCADE"), index=True)
+    conversation_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # generate | edit
+    action: Mapped[str] = mapped_column(String(32), nullable=False, default="generate")
+    prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # 相对 media 根目录，如 {api_key_id}/{uuid}.png
+    storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    # 对外访问路径 /media/...
+    public_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    api_key: Mapped["ApiKey"] = relationship(back_populates="generated_images")

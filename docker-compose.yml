@@ -1,25 +1,18 @@
 services:
-  backend:
-    build: ./backend
+  app:
+    build: .
     restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8000"
     environment:
       DATABASE_URL: sqlite:////data/portal.db
+      STATIC_DIR: /app/static
+      MEDIA_DIR: /data/media
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-admin}
       JWT_SECRET: ${JWT_SECRET:-change-me-jwt-secret-please}
       UPSTREAM_TIMEOUT_SECONDS: ${UPSTREAM_TIMEOUT_SECONDS:-300}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
     volumes:
       - ./data:/data
-    # 如需单独暴露 API，可打开 ports
-    # ports:
-    #   - "8000:8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
-  frontend:
-    build: ./frontend
-    restart: unless-stopped
-    ports:
-      - "${PORT:-8080}:80"
-    depends_on:
-      - backend

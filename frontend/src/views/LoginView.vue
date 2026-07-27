@@ -27,23 +27,18 @@ async function onSubmit() {
   <div class="page">
     <div class="card box">
       <h1>对话生图</h1>
-      <p class="muted sub">使用分配的秘钥登录。额度按成功出图张数扣减。</p>
+      <p class="muted sub">使用分配的秘钥登录。成功出图后按张数扣减额度。</p>
 
       <form @submit.prevent="onSubmit">
         <div class="field">
-          <label for="key">API 秘钥</label>
-          <input id="key" v-model="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
+          <label for="key">访问秘钥</label>
+          <input id="key" v-model="apiKey" type="password" placeholder="请输入秘钥" autocomplete="off" />
         </div>
         <div v-if="error" class="err" style="margin-bottom: 12px">{{ error }}</div>
         <button class="primary" type="submit" :disabled="loading || !apiKey.trim()" style="width: 100%">
           {{ loading ? "登录中…" : "登录" }}
         </button>
       </form>
-
-      <p class="muted foot">
-        管理员入口：
-        <router-link to="/admin/login">/admin</router-link>
-      </p>
     </div>
   </div>
 </template>
@@ -65,9 +60,5 @@ h1 {
 .sub {
   margin: 0 0 18px;
   font-size: 13px;
-}
-.foot {
-  margin: 16px 0 0;
-  font-size: 12px;
 }
 </style>

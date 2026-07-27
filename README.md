@@ -1,6 +1,8 @@
 # Image Portal
 
-对话生图门户：秘钥登录、会话历史、多轮改图、管理端分配额度。上游对接 OpenAI 兼容图片接口（chatgpt2api / New API）。
+对话生图门户：秘钥登录、会话历史、多轮改图、管理端分配额度。上游对接 OpenAI 兼容图片接口。
+
+源码前后端分离；**Docker 单容器**对外；本地无 Docker 可分别启动调试。
 
 ## 功能
 
@@ -9,63 +11,86 @@
   - 单口令登录
   - **上游配置**（Base URL / API Key / 默认模型 / response_format）存 SQLite
   - 创建/禁用秘钥、设置额度、用量记录
-- 上游调用（对齐 `newapi-image-test.html`）：
-  - `POST {base}/v1/images/generations`
-  - `POST {base}/v1/images/edits`
-  - `Authorization: Bearer …`
-  - 默认 `response_format: url`
-- 成功出图按张数扣额度；失败不扣
+- 上游：`/v1/images/generations`、`/v1/images/edits`；成功按张扣额度
 
-## 快速启动（Docker）
+## Docker（单容器）
 
 ```bash
 cd image-portal
 cp .env.example .env
-# 编辑 .env：仅需 ADMIN_PASSWORD / JWT_SECRET
+# 编辑 ADMIN_PASSWORD / JWT_SECRET
 docker compose up -d --build
 ```
 
 浏览器：`http://localhost:8080`
 
-1. 打开 `/admin/login`，用 `ADMIN_PASSWORD` 登录  
-2. 在 **上游连接** 填写 Base URL、API Key、默认模型并保存  
-3. 创建用户秘钥并发放  
+1. `/admin/login` 用 `ADMIN_PASSWORD` 登录  
+2. **上游连接** 填 Base URL、API Key、默认模型  
+3. 创建用户秘钥  
 4. 用户用秘钥登录生图  
 
-## 环境变量（仅这些）
+镜像：多阶段构建前端 → 拷入 Python 镜像，由 FastAPI 托管静态 + `/api`。
+
+## 环境变量
 
 | 变量 | 说明 |
 |------|------|
 | `ADMIN_PASSWORD` | 管理口令 |
 | `JWT_SECRET` | JWT 密钥 |
-| `PORT` | 对外端口，默认 8080 |
+| `PORT` | 宿主机映射端口，默认 8080 |
 | `UPSTREAM_TIMEOUT_SECONDS` | 上游超时，默认 300 |
-| `DATABASE_URL` | 一般不用改（容器内 sqlite） |
+| `DATABASE_URL` | 默认容器内 `sqlite:////data/portal.db` |
+| `STATIC_DIR` | 容器内静态目录，默认 `/app/static`（本地开发勿设） |
+| `MEDIA_DIR` | 生成图落盘目录；本地默认 `./media`，容器 `/data/media` |
 
-**不要**再在 `.env` 里写 `UPSTREAM_BASE_URL` / `UPSTREAM_API_KEY` / `DEFAULT_MODEL`，改管理后台。
+**不要**在 `.env` 写 `UPSTREAM_*` / `DEFAULT_MODEL`，改管理后台。
 
-## 本地开发
+## 本地开发（无 Docker）
+
+前后端分开跑；Vite 把 `/api` 代理到后端。
 
 ### 后端
 
-```bash
+```powershell
 cd backend
 python -m venv .venv
-# Windows: .venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-set DATABASE_URL=sqlite:///./portal.db
-set ADMIN_PASSWORD=admin
-set JWT_SECRET=dev-secret
+$env:DATABASE_URL = "sqlite:///./portal.db"
+$env:ADMIN_PASSWORD = "admin"
+$env:JWT_SECRET = "dev-secret"
+# 不要设 STATIC_DIR
 uvicorn app.main:app --reload --port 8000
 ```
 
 ### 前端
 
-```bash
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
+
+或脚本（两终端）：
+
+```powershell
+.\scripts\dev-backend.ps1
+.\scripts\dev-frontend.ps1
+```
+
+浏览器：`http://localhost:5173`（代理 → `http://127.0.0.1:8000`）
+
+### 可选：本地预览生产静态
+
+```powershell
+cd frontend; npm run build
+cd ..\backend
+$env:STATIC_DIR = "..\frontend\dist"
+$env:DATABASE_URL = "sqlite:///./portal.db"
+uvicorn app.main:app --reload --port 8000
+```
+
+访问 `http://localhost:8000`。
 
 ## 主要 API
 
@@ -80,6 +105,7 @@ npm run dev
 | CRUD | `/api/conversations` | 会话 |
 | POST | `/api/generate` | 文生图 |
 | POST | `/api/edit` | 改图 |
+| GET/DELETE | `/api/gallery` | 用户图库（本地持久化） |
 
 ## 注意
 

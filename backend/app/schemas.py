@@ -146,3 +146,18 @@ class GenerateResponse(BaseModel):
     user_message: MessageOut
     assistant_message: MessageOut
     quota_remaining: int
+
+
+# ---------- Gallery ----------
+class GalleryItemOut(BaseModel):
+    id: int
+    public_url: str
+    prompt: str
+    action: str
+    conversation_id: int | None = None
+    created_at: datetime
+
+
+class GalleryListOut(BaseModel):
+    total: int
+    items: list[GalleryItemOut]
