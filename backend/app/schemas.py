@@ -17,6 +17,16 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class GuestRegisterRequest(BaseModel):
+    device_id: str = Field(min_length=1, max_length=256)
+
+
+class GuestRegisterResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    is_new: bool  # 是否首次领取
+
+
 class MeResponse(BaseModel):
     id: int
     name: str

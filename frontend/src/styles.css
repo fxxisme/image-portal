@@ -1,191 +1,260 @@
+/* =====================================================
+   VisionaryAI Design System — inspired by risk-1.html
+   ===================================================== */
+
 :root {
   color-scheme: dark;
-  --bg: #0f1115;
-  --bg-2: #12151c;
-  --card: #171a21;
-  --border: #2a3040;
-  --text: #e8ecf4;
-  --muted: #9aa3b5;
-  --accent: #5b8cff;
-  --accent-2: #3dd68c;
-  --danger: #ff6b7a;
-  --warn: #f0b429;
-  --input: #0c0e13;
-  --sidebar: #13161d;
-  --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* ---- surface layers (darkest → brightest) ---- */
+  --bg:            #0b1326;
+  --bg-2:          #060e20;
+  --card:          #131b2e;
+  --sidebar:       #0b1326;
+  --input:         #0c1224;
+  --border:        #494454;
+  --border-light:  rgba(149, 142, 160, 0.2);
+
+  /* ---- text ---- */
+  --text:          #dae2fd;
+  --muted:         #cbc3d7;
+  --muted-2:       #958ea0;
+
+  /* ---- brand (prismatic purple-blue gradient) ---- */
+  --primary:       #d0bcff;
+  --primary-2:     #a078ff;
+  --secondary:     #adc6ff;
+  --secondary-2:   #0566d9;
+  --tertiary:      #ffafd3;
+
+  /* ---- functional ---- */
+  --accent:        #d0bcff;
+  --accent-2:      #3dd68c;
+  --danger:        #ffb4ab;
+  --danger-bg:     #93000a;
+  --warn:          #f0b429;
+
+  /* ---- effects ---- */
+  --glass-bg:      rgba(19, 27, 46, 0.6);
+  --glass-border:  rgba(149, 142, 160, 0.2);
+  --shadow:        0 12px 40px rgba(0, 0, 0, 0.35);
+  --prismatic:     linear-gradient(135deg, #d0bcff 0%, #a078ff 50%, #adc6ff 100%);
+
+  /* ---- typography ---- */
+  --font-body:     "Geist", system-ui, -apple-system, sans-serif;
+  --font-mono:     "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display:  "Geist", system-ui, -apple-system, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-}
+/* ---- reset ---- */
+* { box-sizing: border-box; }
 
-html,
-body,
-#app {
+html, body, #app {
   margin: 0;
   min-height: 100%;
   height: 100%;
-  background: radial-gradient(1200px 600px at 15% -10%, #1a2744 0%, transparent 55%), var(--bg);
+  background: var(--bg);
   color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
-  color: var(--accent);
+  color: var(--primary);
   text-decoration: none;
+  transition: color 0.2s;
 }
+a:hover { color: var(--primary-2); }
 
-button,
-input,
-textarea,
-select {
+button, input, textarea, select {
   font: inherit;
+  color: inherit;
 }
 
+/* ---- buttons ---- */
 button {
   border: 0;
-  border-radius: 10px;
-  padding: 10px 14px;
+  border-radius: 0.75rem;
+  padding: 10px 16px;
   font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-body);
 }
-
 button:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
+/* primary — prismatic gradient */
 button.primary {
-  background: linear-gradient(180deg, #6b98ff, var(--accent));
-  color: #fff;
+  background: var(--prismatic);
+  color: #23005c;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  box-shadow: 0 4px 20px rgba(160, 120, 255, 0.25);
+}
+button.primary:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: scale(1.02);
+}
+button.primary:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
+/* ghost — transparent bordered */
 button.ghost {
   background: transparent;
   color: var(--muted);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-light);
+  font-family: var(--font-body);
 }
-
-button.danger {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
-  color: #ffd0d5;
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
-}
-
-button.success {
-  background: color-mix(in srgb, var(--accent-2) 18%, transparent);
-  color: #b8f5d4;
-  border: 1px solid color-mix(in srgb, var(--accent-2) 35%, var(--border));
-}
-
-input,
-textarea,
-select {
-  width: 100%;
-  border: 1px solid var(--border);
-  background: var(--input);
+button.ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-color: var(--muted-2);
+}
+
+/* danger */
+button.danger {
+  background: rgba(255, 180, 171, 0.12);
+  color: var(--danger);
+  border: 1px solid rgba(255, 180, 171, 0.3);
+}
+button.danger:hover:not(:disabled) {
+  background: rgba(255, 180, 171, 0.22);
+}
+
+/* success */
+button.success {
+  background: rgba(61, 214, 140, 0.12);
+  color: #b8f5d4;
+  border: 1px solid rgba(61, 214, 140, 0.3);
+}
+button.success:hover:not(:disabled) {
+  background: rgba(61, 214, 140, 0.22);
+}
+
+/* ---- form inputs ---- */
+input, textarea, select {
+  width: 100%;
+  border: 1px solid var(--border-light);
+  background: rgba(12, 18, 36, 0.7);
+  color: var(--text);
+  border-radius: 0.75rem;
+  padding: 10px 14px;
   outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-
-input:focus,
-textarea:focus,
-select:focus {
-  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+input:focus, textarea:focus, select:focus {
+  border-color: var(--primary-2);
+  box-shadow: 0 0 0 3px rgba(160, 120, 255, 0.15);
 }
-
 textarea {
   resize: vertical;
   min-height: 84px;
 }
+::placeholder {
+  color: var(--muted-2);
+}
 
+/* ---- card ---- */
 .card {
-  background: color-mix(in srgb, var(--card) 92%, transparent);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+  padding: 20px;
   box-shadow: var(--shadow);
 }
 
-.muted {
-  color: var(--muted);
+/* ---- glass panel (stronger blur) ---- */
+.glass-panel {
+  background: rgba(19, 27, 46, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(149, 142, 160, 0.18);
+  border-radius: 1.25rem;
 }
+
+/* ---- utilities ---- */
+.muted  { color: var(--muted); }
+.mono   { font-family: var(--font-mono); font-size: 12px; }
+.row    { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
 .field {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
-
 .field label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   margin-bottom: 6px;
+  font-family: var(--font-body);
+  font-weight: 500;
 }
 
-.row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
+/* error notice */
 .err {
-  color: #ffd0d5;
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
-  border-radius: 10px;
-  padding: 10px 12px;
+  color: #ffdad6;
+  background: rgba(147, 0, 10, 0.35);
+  border: 1px solid rgba(255, 180, 171, 0.35);
+  border-radius: 0.75rem;
+  padding: 10px 14px;
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 13px;
 }
 
+/* success notice */
 .ok {
   color: #b8f5d4;
   font-size: 13px;
 }
 
+/* badge / chip */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg-2);
+  border: 1px solid var(--border-light);
+  background: rgba(19, 27, 46, 0.6);
+  backdrop-filter: blur(8px);
   font-size: 12px;
   color: var(--muted);
+  font-family: var(--font-body);
 }
-
 .badge strong {
   color: var(--accent-2);
   font-weight: 700;
 }
 
+/* table */
 .table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
-
-.table th,
-.table td {
-  border-bottom: 1px solid var(--border);
-  padding: 10px 8px;
+.table th, .table td {
+  border-bottom: 1px solid var(--border-light);
+  padding: 10px 10px;
   text-align: left;
   vertical-align: top;
 }
-
 .table th {
   color: var(--muted);
   font-weight: 600;
   font-size: 12px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
 }
 
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-}
+/* scrollbar */
+::-webkit-scrollbar          { width: 6px; height: 6px; }
+::-webkit-scrollbar-track    { background: transparent; }
+::-webkit-scrollbar-thumb    { background: rgba(149, 142, 160, 0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(149, 142, 160, 0.5); }

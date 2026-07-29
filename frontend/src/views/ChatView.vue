@@ -12,11 +12,9 @@ const conversations = ref([]);
 const currentId = ref(null);
 const messages = ref([]);
 const prompt = ref("");
-const n = ref(1);
 const loadingChat = ref(false);
 const sending = ref(false);
 const error = ref("");
-/** 改图参考：远程 URL 或 data URL */
 const editImageSrc = ref("");
 const editPreview = ref("");
 const fileInput = ref(null);
@@ -145,7 +143,6 @@ function onFileChange(ev) {
     error.value = "请上传图片文件";
     return;
   }
-  // 约 8MB 限制，避免 body 过大
   if (file.size > 8 * 1024 * 1024) {
     error.value = "图片请小于 8MB";
     return;
@@ -178,19 +175,34 @@ async function send() {
 
   sending.value = true;
   error.value = "";
+
+  const optimisticUserMsg = {
+    id: "pending-" + Date.now(),
+    role: "user",
+    content: text,
+    ref_image_url: editImageSrc.value || undefined,
+  };
+  messages.value.push(optimisticUserMsg);
+  prompt.value = "";
+  const refImage = editImageSrc.value;
+  const refPreview = editPreview.value;
+  clearEditImage();
+  await nextTick();
+  scrollBottom();
+
   const bodyBase = {
     conversation_id: currentId.value,
     prompt: text,
-    n: Number(n.value) || 1,
+    n: 1,
   };
 
   try {
     let data;
-    if (editImageSrc.value) {
+    if (refImage) {
       data = await request("/api/edit", {
         method: "POST",
         token: auth.userToken,
-        body: { ...bodyBase, image_url: editImageSrc.value },
+        body: { ...bodyBase, image_url: refImage },
       });
     } else {
       data = await request("/api/generate", {
@@ -200,16 +212,21 @@ async function send() {
       });
     }
 
-    messages.value.push(data.user_message, data.assistant_message);
+    const idx = messages.value.findIndex((m) => m.id === optimisticUserMsg.id);
+    if (idx !== -1) {
+      messages.value.splice(idx, 1, data.user_message);
+    } else {
+      messages.value.push(data.user_message);
+    }
+    messages.value.push(data.assistant_message);
     auth.setQuotaRemaining(data.quota_remaining);
     if (auth.me) auth.me.quota_used = (auth.me.quota_total || 0) - data.quota_remaining;
-    prompt.value = "";
-    // 提交后退出改图附件，避免误连发；可再点「基于此图修改」
-    clearEditImage();
     await loadConversations();
     await nextTick();
     scrollBottom();
   } catch (e) {
+    const idx = messages.value.findIndex((m) => m.id === optimisticUserMsg.id);
+    if (idx !== -1) messages.value.splice(idx, 1);
     error.value = e.message || String(e);
   } finally {
     sending.value = false;
@@ -217,6 +234,11 @@ async function send() {
 }
 
 function logout() {
+  auth.logoutUser();
+  router.push({ name: "login" });
+}
+
+function goLogin() {
   auth.logoutUser();
   router.push({ name: "login" });
 }
@@ -238,13 +260,22 @@ onMounted(async () => {
 
 <template>
   <div class="shell">
+    <!-- atmosphere blobs -->
+    <div class="atmo">
+      <div class="blob blob-1" />
+      <div class="blob blob-2" />
+    </div>
+
+    <!-- ====== sidebar ====== -->
     <aside class="sidebar">
       <div class="side-top">
         <div class="brand">对话生图</div>
-        <button class="primary" type="button" style="width: 100%" @click="createConversation">
-          新建对话
-        </button>
       </div>
+
+      <button class="primary new-chat-btn" type="button" @click="createConversation">
+        ＋ 新建对话
+      </button>
+
       <div class="conv-list">
         <button
           v-for="c in conversations"
@@ -256,25 +287,27 @@ onMounted(async () => {
         >
           <div class="conv-title">{{ c.title || "未命名" }}</div>
           <div class="conv-meta muted">{{ new Date(c.updated_at).toLocaleString() }}</div>
-          <span class="del" title="删除" @click.stop="removeConversation(c.id)">×</span>
+          <span class="del" title="删除" @click.stop="removeConversation(c.id)">&times;</span>
         </button>
         <div v-if="!conversations.length" class="muted empty">暂无对话</div>
       </div>
     </aside>
 
+    <!-- ====== main ====== -->
     <main class="main">
-      <header class="bar">
+      <!-- top bar -->
+      <header class="bar glass-bar">
         <div>
-          <div class="title">{{ currentTitle }}</div>
-          <div class="muted sub">{{ quotaText }}</div>
+          <div class="title">对话生图</div>
+          <div class="sub muted">{{ quotaText }}</div>
         </div>
-        <div class="row">
+        <div class="bar-actions">
           <button class="ghost" type="button" @click="galleryOpen = true">我的图库</button>
-          <span class="badge remain">
+          <span class="badge">
             剩余 <strong>{{ auth.me?.quota_remaining ?? "-" }}</strong> 张
           </span>
           <span class="badge" v-if="auth.me?.name">{{ auth.me.name }}</span>
-          <button class="ghost" type="button" @click="logout">退出</button>
+          <button v-if="auth.isGuest" class="ghost" type="button" @click="goLogin">登录</button>
         </div>
       </header>
 
@@ -286,36 +319,44 @@ onMounted(async () => {
 
       <div v-if="error" class="err ban">{{ error }}</div>
 
+      <!-- messages -->
       <div ref="scroller" class="messages">
-        <div v-if="loadingChat" class="muted center">加载中…</div>
-        <div v-else-if="!messages.length" class="muted center tip">
-          输入描述即可生图；上传图片或点「基于此图修改」可改图。成功出图会扣额度。
+        <div v-if="loadingChat" class="center muted">加载中…</div>
+        <div v-else-if="!messages.length" class="center tip">
+          输入描述即可生图；上传图片后可改图。成功出图会扣额度。
         </div>
 
         <div v-for="m in messages" :key="m.id" class="msg" :class="m.role">
-          <div class="bubble">
-            <div class="role">{{ m.role === "user" ? "你" : "助手" }}</div>
+          <div class="bubble" :class="m.role">
+            <div class="role-tag">{{ m.role === "user" ? "你" : "AI" }}</div>
             <div class="content">{{ m.content }}</div>
+
             <div v-if="m.ref_image_url && m.role === 'user'" class="ref-thumb">
               <img :src="m.ref_image_url" alt="参考图" />
             </div>
+
             <div v-if="m.image_urls?.length" class="imgs">
               <div v-for="(url, idx) in m.image_urls" :key="idx" class="img-card">
                 <a :href="url" target="_blank" rel="noopener">
                   <img :src="url" :alt="'image-' + idx" loading="lazy" />
                 </a>
-                <div class="img-actions">
-                  <button class="success" type="button" @click="useAsEditRef(url)">基于此图修改</button>
-                  <a class="link" :href="url" target="_blank" rel="noopener">查看原图</a>
-                </div>
               </div>
             </div>
-            <div v-if="m.cost" class="meta muted">消耗 {{ m.cost }} 张</div>
+            <div v-if="m.cost" class="cost muted">消耗 {{ m.cost }} 张</div>
+          </div>
+        </div>
+
+        <div v-if="sending" class="msg assistant">
+          <div class="bubble assistant loading-bubble">
+            <span class="dot" />
+            <span class="dot" />
+            <span class="dot" />
           </div>
         </div>
       </div>
 
-      <footer class="composer card">
+      <!-- ====== composer area (matching risk-1.html style) ====== -->
+      <div class="composer-area">
         <div v-if="isEditMode" class="edit-banner">
           <div class="edit-info">
             <img v-if="editPreview" class="edit-thumb" :src="editPreview" alt="参考" />
@@ -327,9 +368,9 @@ onMounted(async () => {
           <button class="ghost" type="button" @click="clearEditImage">移除图片</button>
         </div>
 
-        <div class="input-row">
-          <button class="ghost attach" type="button" title="上传参考图" @click="pickFile">
-            图片
+        <div class="input-row glass-panel">
+          <button class="attach-btn" type="button" title="上传参考图" @click="pickFile">
+            <span class="attach-icon">＋</span>
           </button>
           <input
             ref="fileInput"
@@ -342,59 +383,105 @@ onMounted(async () => {
             v-model="prompt"
             :placeholder="isEditMode ? '描述如何修改这张图…' : '描述你想生成的图片…'"
             @keydown.enter.exact.prevent="send"
+            rows="1"
           />
-        </div>
-
-        <div class="composer-bar">
-          <label class="mini">
-            张数
-            <select v-model.number="n">
-              <option :value="1">1</option>
-              <option :value="2">2</option>
-              <option :value="3">3</option>
-              <option :value="4">4</option>
-            </select>
-          </label>
           <button
-            class="primary"
+            class="send-btn"
             type="button"
             :disabled="sending || !prompt.trim()"
             @click="send"
           >
-            {{ sending ? "处理中…" : isEditMode ? "提交改图" : "生成" }}
+            <span>{{ sending ? "生成中…" : isEditMode ? "提交改图" : "生成" }}</span>
+            <span class="bolt">⚡</span>
           </button>
         </div>
-        <div class="muted hint">生成可能需要一些时间。失败不扣额度。</div>
-      </footer>
+
+        <p class="hint">
+          <span class="hint-icon">ⓘ</span>
+          生成可能需要一些时间。失败不扣额度。
+        </p>
+      </div>
     </main>
   </div>
 </template>
 
 <style scoped>
+/* ========= layout ========= */
 .shell {
   display: grid;
   grid-template-columns: 280px 1fr;
-  height: 100%;
-  min-height: 100vh;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
 }
+
+/* atmosphere */
+.atmo {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.18;
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+}
+.blob-1 {
+  top: 15%;
+  right: -5%;
+  width: 450px;
+  height: 450px;
+  background: var(--primary);
+}
+.blob-2 {
+  bottom: 8%;
+  left: -10%;
+  width: 360px;
+  height: 360px;
+  background: var(--secondary);
+}
+
+/* ========= sidebar ========= */
 .sidebar {
-  border-right: 1px solid var(--border);
-  background: color-mix(in srgb, var(--sidebar) 92%, transparent);
+  position: relative;
+  z-index: 2;
+  background: rgba(6, 14, 32, 0.75);
+  backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(149, 142, 160, 0.15);
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 .side-top {
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 20px 20px 12px;
 }
 .brand {
+  font-family: var(--font-display);
+  font-size: 20px;
   font-weight: 700;
-  margin-bottom: 12px;
+  background: var(--prismatic);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
+
+.new-chat-btn {
+  width: calc(100% - 32px);
+  margin: 4px 16px 12px;
+  padding: 12px 0;
+  border-radius: 0.75rem;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
 .conv-list {
   overflow: auto;
-  padding: 8px;
+  padding: 4px 10px;
   flex: 1;
 }
 .conv-item {
@@ -403,172 +490,194 @@ onMounted(async () => {
   background: transparent;
   color: var(--text);
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: 0.75rem;
   padding: 10px 12px;
   position: relative;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  transition: all 0.2s;
 }
 .conv-item:hover {
-  background: color-mix(in srgb, var(--card) 80%, transparent);
+  background: rgba(255, 255, 255, 0.04);
 }
 .conv-item.active {
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: rgba(173, 198, 255, 0.35);
+  border-right: 3px solid var(--secondary);
+  background: rgba(5, 102, 217, 0.12);
 }
 .conv-title {
   font-size: 13px;
   font-weight: 600;
-  padding-right: 18px;
+  padding-right: 20px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .conv-meta {
   font-size: 11px;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 .del {
   position: absolute;
   right: 8px;
   top: 8px;
-  color: var(--muted);
-  font-size: 16px;
+  color: var(--muted-2);
+  font-size: 18px;
   line-height: 1;
-  padding: 2px 6px;
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
 }
-.del:hover {
-  color: var(--danger);
-}
-.empty {
-  padding: 16px;
-  font-size: 13px;
-}
+.del:hover { color: var(--danger); }
+.empty { padding: 20px 12px; font-size: 13px; text-align: center; }
+
+/* ========= main ========= */
 .main {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
   height: 100vh;
 }
+
+/* top bar */
 .bar {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 70%, transparent);
-  backdrop-filter: blur(8px);
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(149, 142, 160, 0.12);
+}
+.glass-bar {
+  background: rgba(11, 19, 38, 0.7);
+  backdrop-filter: blur(12px);
 }
 .title {
   font-size: 16px;
   font-weight: 700;
+  font-family: var(--font-display);
 }
 .sub {
   font-size: 12px;
   margin-top: 2px;
 }
-.remain strong {
-  color: var(--accent-2);
+.bar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 .ban {
-  margin: 12px 18px 0;
+  margin: 10px 18px 0;
 }
+
+/* messages */
 .messages {
   flex: 1;
   overflow: auto;
-  padding: 18px;
+  padding: 24px 20px;
 }
 .center {
   text-align: center;
-  padding: 40px 12px;
+  padding: 60px 20px;
 }
 .tip {
-  max-width: 520px;
+  max-width: 480px;
   margin: 40px auto;
   line-height: 1.6;
+  font-size: 14px;
 }
+
 .msg {
   display: flex;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
-.msg.user {
-  justify-content: flex-end;
-}
-.msg.assistant {
-  justify-content: flex-start;
-}
+.msg.user     { justify-content: flex-end; }
+.msg.assistant { justify-content: flex-start; }
+
 .bubble {
-  max-width: min(720px, 92%);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 12px 14px;
+  max-width: min(720px, 88%);
+  border-radius: 1rem;
+  padding: 14px 16px;
 }
-.msg.user .bubble {
-  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+.bubble.user {
+  background: rgba(160, 120, 255, 0.12);
+  border: 1px solid rgba(160, 120, 255, 0.2);
 }
-.role {
-  font-size: 11px;
-  color: var(--muted);
+.bubble.assistant {
+  background: rgba(19, 27, 46, 0.55);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(149, 142, 160, 0.15);
+}
+
+.role-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted-2);
   margin-bottom: 6px;
 }
+
 .content {
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.5;
+  line-height: 1.55;
+  font-size: 14px;
 }
-.ref-thumb {
-  margin-top: 8px;
-}
+
+.ref-thumb { margin-top: 10px; }
 .ref-thumb img {
-  max-width: 120px;
-  max-height: 120px;
+  max-width: 140px;
+  max-height: 140px;
   object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  border: 1px solid var(--border-light);
 }
+
 .imgs {
-  margin-top: 12px;
+  margin-top: 14px;
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 .img-card img {
   width: 100%;
   max-height: 56vh;
   object-fit: contain;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: #0a0c10;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-light);
+  background: #060e20;
   display: block;
 }
-.img-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-top: 8px;
-}
-.link {
-  font-size: 13px;
-}
-.meta {
+.cost {
   margin-top: 8px;
   font-size: 12px;
 }
-.composer {
-  margin: 0 18px 18px;
-  padding: 14px;
+
+/* ========= composer area (risk-1.html inspired) ========= */
+.composer-area {
+  padding: 48px 24px 24px;
+  background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
+
 .edit-banner {
+  width: 100%;
+  max-width: 56rem;
   display: flex;
   justify-content: space-between;
   gap: 10px;
   align-items: center;
-  margin-bottom: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--accent-2) 35%, var(--border));
-  background: color-mix(in srgb, var(--accent-2) 10%, transparent);
+  margin-bottom: 4px;
+  padding: 10px 16px;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(61, 214, 140, 0.3);
+  background: rgba(61, 214, 140, 0.08);
+  backdrop-filter: blur(8px);
 }
 .edit-info {
   display: flex;
@@ -581,65 +690,151 @@ onMounted(async () => {
   width: 48px;
   height: 48px;
   object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-light);
   flex-shrink: 0;
 }
-.tiny {
-  font-size: 12px;
-  margin-top: 2px;
-}
+.tiny { font-size: 12px; margin-top: 2px; }
+
 .input-row {
+  width: 100%;
+  max-width: 56rem;
   display: flex;
-  gap: 8px;
-  align-items: stretch;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 1rem;
+  transition: box-shadow 0.2s, border-color 0.2s;
 }
-.attach {
+.input-row:focus-within {
+  box-shadow: 0 0 0 2px rgba(208, 188, 255, 0.25);
+  border-color: rgba(208, 188, 255, 0.35);
+}
+
+.attach-btn {
   flex-shrink: 0;
-  align-self: flex-end;
-  min-width: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
 }
+.attach-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+.attach-icon {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 300;
+}
+
 .input-row textarea {
   flex: 1;
-  min-height: 72px;
+  min-height: 80px;
+  max-height: 200px;
+  border: none;
+  background: transparent;
+  padding: 10px 0;
+  font-size: 16px;
+  line-height: 1.6;
+  font-weight: 400;
+  resize: none;
+  outline: none;
+  box-shadow: none;
 }
-.hidden-file {
-  display: none;
-}
-.composer-bar {
+
+.send-btn {
+  flex-shrink: 0;
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: end;
-  margin-top: 10px;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 28px;
+  border-radius: 0.75rem;
+  background: var(--prismatic);
+  color: #23005c;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  box-shadow: 0 4px 20px rgba(160, 120, 255, 0.25);
+  transition: all 0.2s;
 }
-.mini {
-  display: grid;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--muted);
+.send-btn:hover:not(:disabled) {
+  transform: scale(1.02);
+  opacity: 0.93;
 }
-.mini select {
-  min-width: 72px;
+.send-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
+.send-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
+  background: rgba(149, 142, 160, 0.18);
+  color: var(--muted-2);
+}
+.bolt {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.hidden-file { display: none; }
+
 .hint {
-  margin-top: 8px;
   font-size: 12px;
+  color: rgba(203, 195, 215, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+.hint-icon {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+/* ---- loading dots ---- */
+.loading-bubble {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 16px 22px;
+  min-width: 64px;
+  justify-content: center;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-2);
+  animation: bounce 1.4s ease-in-out infinite both;
+}
+.dot:nth-child(1) { animation-delay: 0s; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.5); opacity: 0.35; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* ---- responsive ---- */
 @media (max-width: 860px) {
   .shell {
     grid-template-columns: 1fr;
   }
   .sidebar {
-    max-height: 220px;
+    max-height: 200px;
   }
   .main {
     height: auto;
-    min-height: calc(100vh - 220px);
-  }
-  .composer-bar {
-    flex-direction: column;
-    align-items: stretch;
+    min-height: calc(100vh - 200px);
   }
 }
 </style>

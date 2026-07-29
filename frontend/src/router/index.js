@@ -15,12 +15,21 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore();
-  if (to.meta.requiresUser && !auth.isUserLoggedIn) return { name: "login" };
   if (to.meta.requiresAdmin && !auth.isAdminLoggedIn) return { name: "admin-login" };
-  if (to.name === "login" && auth.isUserLoggedIn) return { name: "chat" };
   if (to.name === "admin-login" && auth.isAdminLoggedIn) return { name: "admin" };
+  if (to.name === "login" && auth.isUserLoggedIn && !auth.isGuest) return { name: "chat" };
+
+  if (to.meta.requiresUser && !auth.isUserLoggedIn) {
+    try {
+      await auth.guestRegister();
+      return true;
+    } catch {
+      return { name: "login" };
+    }
+  }
+
   return true;
 });
 

@@ -177,48 +177,46 @@ onMounted(load);
 
 <template>
   <div class="layout">
+    <!-- atmosphere -->
+    <div class="atmo">
+      <div class="blob blob-1" />
+      <div class="blob blob-2" />
+    </div>
+
     <header class="top">
       <div>
-        <h1>管理后台</h1>
+        <h1>
+          <span class="brand-text">VisionaryAI</span>
+          <span class="admin-chip">Admin</span>
+        </h1>
         <p class="muted">上游配置 · 秘钥额度 · 用量</p>
       </div>
-      <div class="row">
-        <button class="ghost" type="button" @click="load" :disabled="loading">刷新</button>
+      <div class="top-btns">
+        <button class="ghost" type="button" :disabled="loading" @click="load">刷新</button>
         <button class="ghost" type="button" @click="logout">退出</button>
       </div>
     </header>
 
-    <div v-if="error" class="err" style="margin-bottom: 14px">{{ error }}</div>
+    <div v-if="error" class="err" style="margin-bottom: 16px">{{ error }}</div>
 
-    <section class="card" style="margin-bottom: 16px">
+    <!-- 上游配置 -->
+    <section class="glass-panel section-card">
       <h2>上游连接</h2>
       <p class="muted tip">
-        配置 chatgpt2api / New API。不写在 Docker 环境变量里，保存在数据库。
-        API Key 仅在填写时更新；留空表示保持原值。
+        配置 chatgpt2api / New API。API Key 仅在填写时更新；留空表示保持原值。
       </p>
       <div class="settings-grid">
         <div class="field">
-          <label>Upstream Base URL（可带或不带 /v1）</label>
-          <input
-            v-model="settingsForm.upstream_base_url"
-            type="url"
-            placeholder="https://xx.xx.com"
-          />
+          <label>Upstream Base URL</label>
+          <input v-model="settingsForm.upstream_base_url" type="url" placeholder="https://xx.xx.com" />
         </div>
         <div class="field">
           <label>
             Upstream API Key
-            <span v-if="settingsMeta.has_upstream_api_key" class="muted">
-              （当前 {{ settingsMeta.upstream_api_key_masked }}）
-            </span>
+            <span v-if="settingsMeta.has_upstream_api_key" class="muted">（当前 {{ settingsMeta.upstream_api_key_masked }}）</span>
             <span v-else class="muted">（未配置）</span>
           </label>
-          <input
-            v-model="settingsForm.upstream_api_key"
-            type="password"
-            placeholder="留空则不修改；填写则覆盖"
-            autocomplete="off"
-          />
+          <input v-model="settingsForm.upstream_api_key" type="password" placeholder="留空则不修改" autocomplete="off" />
         </div>
         <div class="field">
           <label>默认模型</label>
@@ -232,7 +230,7 @@ onMounted(load);
           </select>
         </div>
       </div>
-      <div class="row" style="margin-top: 8px">
+      <div class="settings-foot">
         <button class="primary" type="button" :disabled="savingSettings" @click="saveSettings">
           {{ savingSettings ? "保存中…" : "保存上游配置" }}
         </button>
@@ -243,14 +241,15 @@ onMounted(load);
       </div>
     </section>
 
-    <section class="card" style="margin-bottom: 16px">
+    <!-- 新建秘钥 -->
+    <section class="glass-panel section-card">
       <h2>新建秘钥</h2>
       <div class="form-grid">
-        <div class="field" style="margin: 0">
+        <div class="field" style="margin:0">
           <label>名称</label>
           <input v-model="form.name" placeholder="例如：张三 / 测试" />
         </div>
-        <div class="field" style="margin: 0">
+        <div class="field" style="margin:0">
           <label>额度（张）</label>
           <input v-model.number="form.quota_total" type="number" min="0" />
         </div>
@@ -265,7 +264,8 @@ onMounted(load);
       </div>
     </section>
 
-    <section class="card" style="margin-bottom: 16px">
+    <!-- 秘钥列表 -->
+    <section class="glass-panel section-card">
       <h2>秘钥列表</h2>
       <div class="table-wrap">
         <table class="table">
@@ -281,7 +281,7 @@ onMounted(load);
           </thead>
           <tbody>
             <tr v-for="k in keys" :key="k.id">
-              <td>{{ k.id }}</td>
+              <td class="mono">{{ k.id }}</td>
               <td>{{ k.name }}</td>
               <td class="mono">{{ k.key_prefix }}…</td>
               <td>
@@ -289,7 +289,7 @@ onMounted(load);
                 <div class="muted">剩余 {{ k.quota_remaining }}</div>
               </td>
               <td>
-                <span :class="k.enabled ? 'ok' : 'err'" style="padding: 2px 8px; display: inline-block">
+                <span :class="k.enabled ? 'ok' : 'err'" class="status-pill">
                   {{ k.enabled ? "启用" : "禁用" }}
                 </span>
               </td>
@@ -309,7 +309,8 @@ onMounted(load);
       </div>
     </section>
 
-    <section class="card">
+    <!-- 用量 -->
+    <section class="glass-panel section-card">
       <h2>最近用量</h2>
       <div class="table-wrap">
         <table class="table">
@@ -331,7 +332,7 @@ onMounted(load);
               <td>{{ u.cost }}</td>
               <td class="mono">{{ u.model || "-" }}</td>
               <td>
-                <span :class="u.success ? 'ok' : 'err'" style="padding: 2px 8px; display: inline-block">
+                <span :class="u.success ? 'ok' : 'err'" class="status-pill">
                   {{ u.success ? "成功" : "失败" }}
                 </span>
                 <div v-if="u.detail" class="muted mono">{{ u.detail }}</div>
@@ -351,63 +352,148 @@ onMounted(load);
 .layout {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 22px 16px 40px;
+  padding: 24px 16px 48px;
+  position: relative;
 }
+
+/* atmosphere */
+.atmo {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.16;
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+}
+.blob-1 {
+  top: 10%;
+  right: -5%;
+  width: 400px;
+  height: 400px;
+  background: var(--primary);
+}
+.blob-2 {
+  bottom: 5%;
+  left: -8%;
+  width: 320px;
+  height: 320px;
+  background: var(--secondary);
+}
+
+/* top */
 .top {
+  position: relative;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+}
+.top-btns {
+  display: flex;
+  gap: 8px;
 }
 h1 {
   margin: 0;
   font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-h2 {
-  margin: 0 0 14px;
-  font-size: 16px;
+.brand-text {
+  font-family: var(--font-display);
+  background: var(--prismatic);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.admin-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--tertiary);
+  background: rgba(255, 175, 211, 0.1);
+  border: 1px solid rgba(255, 175, 211, 0.2);
+  padding: 2px 8px;
+  border-radius: 999px;
 }
 .top p {
   margin: 4px 0 0;
   font-size: 13px;
 }
-.tip {
-  margin: -6px 0 14px;
-  font-size: 12px;
-  line-height: 1.5;
+
+/* section card */
+.section-card {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 20px;
+  padding: 24px;
 }
+h2 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 700;
+  font-family: var(--font-display);
+}
+.tip {
+  margin: -2px 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
 }
+.settings-foot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 2fr 1fr auto;
-  gap: 12px;
+  gap: 14px;
   align-items: end;
 }
 .actions {
   display: flex;
   align-items: end;
 }
+
 .created {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
 }
 .keyline {
-  margin: 8px 0;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--input);
-  border: 1px solid var(--border);
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: 0.75rem;
+  background: rgba(12, 18, 36, 0.6);
+  border: 1px solid var(--border-light);
   word-break: break-all;
+  font-size: 13px;
 }
-.table-wrap {
-  overflow: auto;
+
+.table-wrap { overflow: auto; }
+.status-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
 }
+
 @media (max-width: 720px) {
   .form-grid,
   .settings-grid {

@@ -81,23 +81,23 @@ onMounted(() => {
 
 <template>
   <div v-if="open" class="overlay" @click="onBackdrop">
-    <div class="panel card" role="dialog" aria-modal="true" aria-label="我的图库">
+    <div class="panel glass-panel" role="dialog" aria-modal="true" aria-label="我的图库">
       <header class="head">
         <div>
           <div class="h-title">我的图库</div>
           <div class="muted tiny">共 {{ total }} 张 · 已保存到本站</div>
         </div>
-        <div class="row">
+        <div class="head-btns">
           <button class="ghost" type="button" :disabled="loading" @click="load(true)">刷新</button>
           <button class="ghost" type="button" @click="emit('close')">关闭</button>
         </div>
       </header>
 
-      <div v-if="error" class="err ban-in">{{ error }}</div>
+      <div v-if="error" class="err" style="margin:10px 16px 0">{{ error }}</div>
 
       <div class="body">
-        <div v-if="loading" class="muted center">加载中…</div>
-        <div v-else-if="!items.length" class="muted center">还没有生成过的图片</div>
+        <div v-if="loading" class="center muted">加载中…</div>
+        <div v-else-if="!items.length" class="center muted">还没有生成过的图片</div>
         <div v-else class="grid">
           <div v-for="it in items" :key="it.id" class="cell">
             <a :href="it.public_url" target="_blank" rel="noopener">
@@ -133,7 +133,8 @@ onMounted(() => {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(6, 14, 32, 0.65);
+  backdrop-filter: blur(6px);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -145,55 +146,62 @@ onMounted(() => {
   flex-direction: column;
   padding: 0;
   overflow: hidden;
+  border-radius: 1.25rem;
 }
 .head {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+.head-btns {
+  display: flex;
+  gap: 8px;
 }
 .h-title {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 17px;
+  font-family: var(--font-display);
 }
 .tiny {
   font-size: 12px;
   margin-top: 2px;
 }
-.ban-in {
-  margin: 12px 16px 0;
-}
 .body {
   overflow: auto;
-  padding: 16px;
+  padding: 18px;
   flex: 1;
 }
 .center {
   text-align: center;
-  padding: 40px 12px;
+  padding: 48px 16px;
 }
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 .cell {
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 0.75rem;
   overflow: hidden;
-  background: var(--bg-2);
+  background: rgba(12, 18, 36, 0.5);
+  transition: border-color 0.2s;
+}
+.cell:hover {
+  border-color: var(--primary-2);
 }
 .cell img {
   display: block;
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  background: #0a0c10;
+  background: #060e20;
 }
 .cap {
-  padding: 8px 10px 10px;
+  padding: 10px 12px 12px;
 }
 .prompt {
   font-size: 12px;
@@ -215,6 +223,6 @@ onMounted(() => {
 }
 .more {
   text-align: center;
-  margin-top: 16px;
+  margin-top: 18px;
 }
 </style>
