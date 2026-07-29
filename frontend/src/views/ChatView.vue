@@ -225,8 +225,23 @@ async function send() {
     await nextTick();
     scrollBottom();
   } catch (e) {
-    const idx = messages.value.findIndex((m) => m.id === optimisticUserMsg.id);
-    if (idx !== -1) messages.value.splice(idx, 1);
+    // 保留用户消息，追加一条助手风格的错误消息
+    let detail = e.message || String(e);
+    try {
+      if (e.body?.detail?.body) {
+        detail += "\n\n" + JSON.stringify(e.body.detail.body, null, 2);
+      } else if (e.body) {
+        detail += "\n\n" + JSON.stringify(e.body, null, 2);
+      }
+    } catch {
+      // ignore
+    }
+    messages.value.push({
+      id: "error-" + Date.now(),
+      role: "assistant",
+      content: "❌ 生成失败\n\n" + detail,
+      cost: 0,
+    });
     error.value = e.message || String(e);
   } finally {
     sending.value = false;

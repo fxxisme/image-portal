@@ -25,9 +25,9 @@ class ApiKey(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
-    conversations: Mapped[list["Conversation"]] = relationship(back_populates="api_key")
-    usage_logs: Mapped[list["UsageLog"]] = relationship(back_populates="api_key")
-    generated_images: Mapped[list["GeneratedImage"]] = relationship(back_populates="api_key")
+    conversations: Mapped[list["Conversation"]] = relationship(back_populates="api_key", passive_deletes=True)
+    usage_logs: Mapped[list["UsageLog"]] = relationship(back_populates="api_key", passive_deletes=True)
+    generated_images: Mapped[list["GeneratedImage"]] = relationship(back_populates="api_key", passive_deletes=True)
 
     @property
     def quota_remaining(self) -> int:

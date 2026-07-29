@@ -22,6 +22,8 @@ from app.services.settings import get_or_create_settings
 
 logger = logging.getLogger(__name__)
 
+_MAX_REDIRECTS = 3
+
 
 class UpstreamError(Exception):
     def __init__(self, message: str, status_code: int | None = None, body: Any = None):
@@ -62,9 +64,33 @@ def _require_config(cfg: UpstreamConfig) -> None:
         raise UpstreamError("未配置上游 API Key，请在管理后台填写")
 
 
-def _client() -> httpx.AsyncClient:
+async def _post_json(url: str, *, headers: dict, json: dict) -> httpx.Response:
+    """发送 POST 请求，手动跟随重定向以保持 POST 方法（避免 httpx 默认将 301/302 改为 GET）。"""
     settings = get_settings()
-    return httpx.AsyncClient(timeout=settings.upstream_timeout_seconds)
+    seen: set[str] = set()
+    for _ in range(_MAX_REDIRECTS + 1):
+        if url in seen:
+            raise UpstreamError("上游重定向环路")
+        seen.add(url)
+
+        async with httpx.AsyncClient(timeout=settings.upstream_timeout_seconds) as client:
+            try:
+                res = await client.post(url, headers=headers, json=json)
+            except httpx.TimeoutException as exc:
+                raise UpstreamError("上游请求超时") from exc
+            except httpx.HTTPError as exc:
+                raise UpstreamError(f"上游网络错误: {exc}") from exc
+
+        if res.status_code in (301, 302, 307, 308):
+            location = res.headers.get("location")
+            if not location:
+                return res
+            logger.info("upstream redirect %s -> %s", url, location)
+            url = location
+            continue
+        return res
+
+    raise UpstreamError("上游重定向次数过多")
 
 
 async def images_generations(
@@ -98,13 +124,7 @@ async def images_generations(
 
     logger.info("upstream generations %s model=%s n=%s", endpoint, use_model, n)
 
-    async with _client() as client:
-        try:
-            res = await client.post(endpoint, headers=headers, json=body)
-        except httpx.TimeoutException as exc:
-            raise UpstreamError("上游生图超时") from exc
-        except httpx.HTTPError as exc:
-            raise UpstreamError(f"上游网络错误: {exc}") from exc
+    res = await _post_json(endpoint, headers=headers, json=body)
 
     return _extract_urls(res)
 
@@ -143,13 +163,7 @@ async def images_edits(
 
     logger.info("upstream edits %s model=%s n=%s", endpoint, use_model, n)
 
-    async with _client() as client:
-        try:
-            res = await client.post(endpoint, headers=headers, json=body)
-        except httpx.TimeoutException as exc:
-            raise UpstreamError("上游改图超时") from exc
-        except httpx.HTTPError as exc:
-            raise UpstreamError(f"上游网络错误: {exc}") from exc
+    res = await _post_json(endpoint, headers=headers, json=body)
 
     return _extract_urls(res)
 
