@@ -5,7 +5,7 @@ from app.auth import get_current_api_key
 from app.database import get_db
 from app.models import ApiKey, GeneratedImage
 from app.schemas import GalleryItemOut, GalleryListOut
-from app.services.media import media_root
+from app.services.media import delete_generated_image
 
 router = APIRouter(prefix="/api/gallery", tags=["gallery"])
 
@@ -55,15 +55,7 @@ def delete_gallery_item(
     if not row:
         raise HTTPException(status_code=404, detail="图片不存在")
 
-    path = (media_root() / row.storage_path).resolve()
-    try:
-        path.relative_to(media_root())
-        if path.is_file():
-            path.unlink()
-    except ValueError:
-        pass
-    except OSError:
-        pass
+    delete_generated_image(db, row)
 
     db.delete(row)
     db.commit()

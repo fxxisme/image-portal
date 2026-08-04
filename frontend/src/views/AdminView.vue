@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { request } from "../api/http";
+import { apiUrl, request } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();
@@ -14,6 +14,12 @@ const savingSettings = ref(false);
 const error = ref("");
 const settingsMsg = ref("");
 const createdKey = ref("");
+const images = ref([]);
+const imagesTotal = ref(0);
+const loadingImages = ref(false);
+const activeTab = ref("settings");
+const previewImage = ref(null);
+const downloadingImage = ref(false);
 
 const form = ref({ name: "", quota_total: 20 });
 const settingsForm = ref({
@@ -21,12 +27,24 @@ const settingsForm = ref({
   upstream_api_key: "",
   default_model: "gpt-image-2",
   response_format: "url",
+  webdav_url: "",
+  webdav_username: "",
+  webdav_password: "",
+  webdav_path: "",
+  webdav_public_base_url: "",
 });
 const settingsMeta = ref({
   has_upstream_api_key: false,
   upstream_api_key_masked: "",
   updated_at: null,
+  has_webdav_password: false,
+  webdav_password_masked: "",
 });
+
+function imagesPath(offset = 0) {
+  const params = new URLSearchParams({ limit: "48", offset: String(offset) });
+  return `/api/admin/images?${params}`;
+}
 
 async function load() {
   loading.value = true;
@@ -44,12 +62,20 @@ async function load() {
       upstream_api_key: "",
       default_model: s.default_model || "gpt-image-2",
       response_format: s.response_format || "url",
+      webdav_url: s.webdav_url || "",
+      webdav_username: s.webdav_username || "",
+      webdav_password: "",
+      webdav_path: s.webdav_path || "",
+      webdav_public_base_url: s.webdav_public_base_url || "",
     };
     settingsMeta.value = {
       has_upstream_api_key: s.has_upstream_api_key,
       upstream_api_key_masked: s.upstream_api_key_masked || "",
       updated_at: s.updated_at,
+      has_webdav_password: s.has_webdav_password,
+      webdav_password_masked: s.webdav_password_masked || "",
     };
+    if (activeTab.value === "images") await loadImages();
   } catch (e) {
     error.value = e.message || String(e);
     if (e.status === 401 || e.status === 403) {
@@ -58,6 +84,55 @@ async function load() {
     }
   } finally {
     loading.value = false;
+  }
+}
+
+function selectTab(tab) {
+  activeTab.value = tab;
+  if (tab === "images" && !images.value.length) loadImages();
+}
+
+function openPreview(image) {
+  previewImage.value = image;
+}
+
+function closePreview() {
+  if (!downloadingImage.value) previewImage.value = null;
+}
+
+async function downloadPreview() {
+  const image = previewImage.value;
+  if (!image || downloadingImage.value) return;
+  downloadingImage.value = true;
+  try {
+    const response = await fetch(apiUrl(`/api/admin/images/${image.id}/download`), {
+      headers: { Authorization: `Bearer ${auth.adminToken}` },
+    });
+    if (!response.ok) throw new Error(`下载失败（HTTP ${response.status}）`);
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `image-${image.id}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    error.value = e.message || String(e);
+  } finally {
+    downloadingImage.value = false;
+  }
+}
+
+async function loadImages(append = false) {
+  loadingImages.value = true;
+  try {
+    const offset = append ? images.value.length : 0;
+    const data = await request(imagesPath(offset), { token: auth.adminToken });
+    images.value = append ? [...images.value, ...(data.items || [])] : (data.items || []);
+    imagesTotal.value = data.total || 0;
+  } catch (e) {
+    error.value = e.message || String(e);
+  } finally {
+    loadingImages.value = false;
   }
 }
 
@@ -70,9 +145,15 @@ async function saveSettings() {
       upstream_base_url: settingsForm.value.upstream_base_url.trim(),
       default_model: settingsForm.value.default_model.trim() || "gpt-image-2",
       response_format: settingsForm.value.response_format || "url",
+      webdav_url: settingsForm.value.webdav_url.trim(),
+      webdav_username: settingsForm.value.webdav_username.trim(),
+      webdav_path: settingsForm.value.webdav_path.trim(),
+      webdav_public_base_url: settingsForm.value.webdav_public_base_url.trim(),
     };
     const keyInput = settingsForm.value.upstream_api_key.trim();
     if (keyInput) body.upstream_api_key = keyInput;
+    const webdavPassword = settingsForm.value.webdav_password.trim();
+    if (webdavPassword) body.webdav_password = webdavPassword;
 
     const s = await request("/api/admin/settings", {
       method: "PUT",
@@ -80,14 +161,21 @@ async function saveSettings() {
       body,
     });
     settingsForm.value.upstream_api_key = "";
+    settingsForm.value.webdav_password = "";
     settingsMeta.value = {
       has_upstream_api_key: s.has_upstream_api_key,
       upstream_api_key_masked: s.upstream_api_key_masked || "",
       updated_at: s.updated_at,
+      has_webdav_password: s.has_webdav_password,
+      webdav_password_masked: s.webdav_password_masked || "",
     };
     settingsForm.value.upstream_base_url = s.upstream_base_url || "";
     settingsForm.value.default_model = s.default_model || "gpt-image-2";
     settingsForm.value.response_format = s.response_format || "url";
+    settingsForm.value.webdav_url = s.webdav_url || "";
+    settingsForm.value.webdav_username = s.webdav_username || "";
+    settingsForm.value.webdav_path = s.webdav_path || "";
+    settingsForm.value.webdav_public_base_url = s.webdav_public_base_url || "";
     settingsMsg.value = "上游配置已保存";
   } catch (e) {
     error.value = e.message || String(e);
@@ -199,8 +287,25 @@ onMounted(load);
 
     <div v-if="error" class="err" style="margin-bottom: 16px">{{ error }}</div>
 
+    <nav class="admin-tabs" aria-label="后台页面">
+      <button
+        type="button"
+        :class="{ active: activeTab === 'settings' }"
+        @click="selectTab('settings')"
+      >
+        系统配置
+      </button>
+      <button
+        type="button"
+        :class="{ active: activeTab === 'images' }"
+        @click="selectTab('images')"
+      >
+        全部图片
+      </button>
+    </nav>
+
     <!-- 上游配置 -->
-    <section class="glass-panel section-card">
+    <section v-if="activeTab === 'settings'" class="glass-panel section-card">
       <h2>上游连接</h2>
       <p class="muted tip">
         配置 chatgpt2api / New API。API Key 仅在填写时更新；留空表示保持原值。
@@ -220,7 +325,16 @@ onMounted(load);
         </div>
         <div class="field">
           <label>默认模型</label>
-          <input v-model="settingsForm.default_model" placeholder="gpt-image-2" />
+          <select v-model="settingsForm.default_model">
+            <option value="gpt-image-2">gpt-image-2</option>
+            <option value="grok-imagine-image">grok-imagine-image</option>
+            <option
+              v-if="!['gpt-image-2', 'grok-imagine-image'].includes(settingsForm.default_model)"
+              :value="settingsForm.default_model"
+            >
+              {{ settingsForm.default_model }}
+            </option>
+          </select>
         </div>
         <div class="field">
           <label>response_format</label>
@@ -228,6 +342,36 @@ onMounted(load);
             <option value="url">url</option>
             <option value="b64_json">b64_json</option>
           </select>
+        </div>
+      </div>
+      <h2 class="subsection-title">WebDAV 存储</h2>
+      <p class="muted tip">
+        新图按日期保存；远端目录留空时使用 image-portal。公开访问基址留空时将使用 WebDAV 地址。
+      </p>
+      <div class="settings-grid">
+        <div class="field">
+          <label>WebDAV URL</label>
+          <input v-model="settingsForm.webdav_url" type="url" placeholder="https://dav.example.com/remote.php/dav/files/user" />
+        </div>
+        <div class="field">
+          <label>WebDAV 用户名</label>
+          <input v-model="settingsForm.webdav_username" autocomplete="username" placeholder="用户名" />
+        </div>
+        <div class="field">
+          <label>
+            WebDAV 密码
+            <span v-if="settingsMeta.has_webdav_password" class="muted">（当前 {{ settingsMeta.webdav_password_masked }}）</span>
+            <span v-else class="muted">（未配置）</span>
+          </label>
+          <input v-model="settingsForm.webdav_password" type="password" autocomplete="new-password" placeholder="留空则不修改" />
+        </div>
+        <div class="field">
+          <label>远端目录</label>
+          <input v-model="settingsForm.webdav_path" placeholder="留空使用 image-portal" />
+        </div>
+        <div class="field settings-wide">
+          <label>公开访问基址</label>
+          <input v-model="settingsForm.webdav_public_base_url" type="url" placeholder="https://cdn.example.com/image-portal（留空使用 WebDAV URL）" />
         </div>
       </div>
       <div class="settings-foot">
@@ -241,8 +385,61 @@ onMounted(load);
       </div>
     </section>
 
+    <section v-else class="glass-panel section-card">
+      <div class="gallery-heading">
+        <div>
+          <h2>全部生成图片</h2>
+          <p class="muted tip">共 {{ imagesTotal }} 张，按生成时间倒序展示。</p>
+        </div>
+        <div class="gallery-tools">
+          <button class="ghost" type="button" :disabled="loadingImages" @click="loadImages()">
+            刷新图片
+          </button>
+        </div>
+      </div>
+      <div v-if="images.length" class="image-grid">
+        <button
+          v-for="image in images"
+          :key="image.id"
+          type="button"
+          class="image-item"
+          @click="openPreview(image)"
+        >
+          <img :src="image.public_url" :alt="image.prompt || '生成图片'" loading="lazy" />
+          <div class="image-meta">
+            <span>#{{ image.api_key_id }} · {{ image.api_key_name }}</span>
+            <span>{{ image.action === 'edit' ? '改图' : '生成' }}</span>
+          </div>
+          <div class="image-prompt">{{ image.prompt || '无提示词' }}</div>
+          <time>{{ new Date(image.created_at).toLocaleString() }}</time>
+        </button>
+      </div>
+      <div v-else class="muted gallery-empty">{{ loadingImages ? "图片加载中…" : "暂无生成图片" }}</div>
+      <div v-if="images.length < imagesTotal" class="gallery-more">
+        <button class="ghost" type="button" :disabled="loadingImages" @click="loadImages(true)">
+          {{ loadingImages ? "加载中…" : "加载更多" }}
+        </button>
+      </div>
+    </section>
+
+    <div v-if="previewImage" class="preview-backdrop" role="presentation" @click.self="closePreview">
+      <section class="preview-dialog" role="dialog" aria-modal="true" aria-label="图片预览">
+        <div class="preview-bar">
+          <div class="preview-title">图片预览</div>
+          <div class="preview-actions">
+            <button class="primary" type="button" :disabled="downloadingImage" @click="downloadPreview">
+              {{ downloadingImage ? "下载中…" : "下载原图" }}
+            </button>
+            <button class="ghost preview-close" type="button" aria-label="关闭预览" @click="closePreview">×</button>
+          </div>
+        </div>
+        <img :src="previewImage.public_url" :alt="previewImage.prompt || '生成图片'" />
+        <p v-if="previewImage.prompt" class="preview-prompt">{{ previewImage.prompt }}</p>
+      </section>
+    </div>
+
     <!-- 新建秘钥 -->
-    <section class="glass-panel section-card">
+    <section v-if="activeTab === 'settings'" class="glass-panel section-card">
       <h2>新建秘钥</h2>
       <div class="form-grid">
         <div class="field" style="margin:0">
@@ -265,7 +462,7 @@ onMounted(load);
     </section>
 
     <!-- 秘钥列表 -->
-    <section class="glass-panel section-card">
+    <section v-if="activeTab === 'settings'" class="glass-panel section-card">
       <h2>秘钥列表</h2>
       <div class="table-wrap">
         <table class="table">
@@ -310,7 +507,7 @@ onMounted(load);
     </section>
 
     <!-- 用量 -->
-    <section class="glass-panel section-card">
+    <section v-if="activeTab === 'settings'" class="glass-panel section-card">
       <h2>最近用量</h2>
       <div class="table-wrap">
         <table class="table">
@@ -398,6 +595,28 @@ onMounted(load);
   display: flex;
   gap: 8px;
 }
+.admin-tabs {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  gap: 2px;
+  margin-bottom: 20px;
+  padding: 3px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: rgba(6, 14, 32, 0.5);
+}
+.admin-tabs button {
+  padding: 8px 14px;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+}
+.admin-tabs button:hover { color: var(--text); }
+.admin-tabs button.active {
+  background: rgba(160, 120, 255, 0.18);
+  color: var(--text);
+}
 h1 {
   margin: 0;
   font-size: 22px;
@@ -459,6 +678,12 @@ h2 {
   margin-top: 14px;
   flex-wrap: wrap;
 }
+.settings-wide { grid-column: span 2; }
+.subsection-title {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-light);
+}
 
 .form-grid {
   display: grid;
@@ -487,6 +712,126 @@ h2 {
 }
 
 .table-wrap { overflow: auto; }
+.gallery-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.gallery-heading h2 { margin-bottom: 4px; }
+.gallery-heading .tip { margin: 0; }
+.gallery-tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.image-item {
+  display: block;
+  padding: 0;
+  text-align: left;
+  font-weight: 400;
+  font-family: var(--font-body);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: rgba(6, 14, 32, 0.72);
+  color: var(--text);
+}
+.image-item:hover { border-color: var(--primary-2); color: var(--text); }
+.image-item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.image-item img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: var(--bg-2);
+}
+.image-meta, .image-prompt, .image-item time { display: block; padding: 0 10px; }
+.image-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--primary);
+}
+.image-prompt {
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.image-item time { padding-bottom: 10px; margin-top: 5px; font-size: 10px; color: var(--muted-2); }
+.gallery-empty { padding: 30px 0; text-align: center; }
+.gallery-more { display: flex; justify-content: center; margin-top: 16px; }
+.preview-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 5, 13, 0.78);
+}
+.preview-dialog {
+  width: min(1100px, 100%);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-2);
+  box-shadow: var(--shadow);
+}
+.preview-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+.preview-title { font-weight: 700; font-size: 14px; }
+.preview-actions { display: flex; gap: 8px; align-items: center; }
+.preview-close {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+}
+.preview-dialog > img {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  object-fit: contain;
+  background: #050814;
+}
+.preview-prompt {
+  max-height: 96px;
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  border-top: 1px solid var(--border-light);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
 .status-pill {
   display: inline-block;
   padding: 2px 10px;
@@ -499,5 +844,10 @@ h2 {
   .settings-grid {
     grid-template-columns: 1fr;
   }
+  .settings-wide { grid-column: auto; }
+  .gallery-heading { flex-direction: column; }
+  .gallery-tools { width: 100%; }
+  .preview-backdrop { padding: 12px; }
+  .preview-dialog { max-height: calc(100vh - 24px); }
 }
 </style>

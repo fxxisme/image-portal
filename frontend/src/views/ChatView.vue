@@ -20,6 +20,12 @@ const editPreview = ref("");
 const fileInput = ref(null);
 const scroller = ref(null);
 const galleryOpen = ref(false);
+const selectedModel = ref("");
+
+const modelOptions = computed(() => {
+  const configured = auth.me?.default_model || "gpt-image-2";
+  return [...new Set([configured, "gpt-image-2", "grok-imagine-image"])];
+});
 
 const currentTitle = computed(() => {
   const c = conversations.value.find((x) => x.id === currentId.value);
@@ -38,6 +44,7 @@ const quotaText = computed(() => {
 async function ensureMe() {
   try {
     await auth.fetchMe();
+    if (!selectedModel.value) selectedModel.value = auth.me?.default_model || "gpt-image-2";
   } catch (e) {
     if (e.status === 401) {
       auth.logoutUser();
@@ -194,6 +201,7 @@ async function send() {
     conversation_id: currentId.value,
     prompt: text,
     n: 1,
+    model: selectedModel.value || auth.me?.default_model || "gpt-image-2",
   };
 
   try {
@@ -400,6 +408,11 @@ onMounted(async () => {
             @keydown.enter.exact.prevent="send"
             rows="1"
           />
+          <select v-model="selectedModel" class="model-select" aria-label="生图模型">
+            <option v-for="modelName in modelOptions" :key="modelName" :value="modelName">
+              {{ modelName }}
+            </option>
+          </select>
           <button
             class="send-btn"
             type="button"
@@ -764,6 +777,12 @@ onMounted(async () => {
   outline: none;
   box-shadow: none;
 }
+.model-select {
+  flex: 0 0 168px;
+  width: 168px;
+  padding: 10px;
+  font-size: 12px;
+}
 
 .send-btn {
   flex-shrink: 0;
@@ -850,6 +869,16 @@ onMounted(async () => {
   .main {
     height: auto;
     min-height: calc(100vh - 200px);
+  }
+  .input-row {
+    flex-wrap: wrap;
+  }
+  .input-row textarea {
+    min-width: calc(100% - 56px);
+  }
+  .model-select {
+    flex: 1;
+    width: auto;
   }
 }
 </style>

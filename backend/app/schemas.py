@@ -46,6 +46,12 @@ class SystemSettingsOut(BaseModel):
     has_upstream_api_key: bool
     default_model: str
     response_format: str
+    webdav_url: str
+    webdav_username: str
+    webdav_password_masked: str
+    has_webdav_password: bool
+    webdav_path: str
+    webdav_public_base_url: str
     updated_at: datetime | None = None
 
 
@@ -55,6 +61,12 @@ class SystemSettingsUpdate(BaseModel):
     upstream_api_key: str | None = None
     default_model: str | None = Field(default=None, max_length=128)
     response_format: str | None = Field(default=None, max_length=32)
+    webdav_url: str | None = Field(default=None, max_length=512)
+    webdav_username: str | None = Field(default=None, max_length=256)
+    # 传空或不传 = 不修改现有密码
+    webdav_password: str | None = None
+    webdav_path: str | None = Field(default=None, max_length=512)
+    webdav_public_base_url: str | None = Field(default=None, max_length=512)
 
 
 # ---------- Admin keys ----------
@@ -171,3 +183,13 @@ class GalleryItemOut(BaseModel):
 class GalleryListOut(BaseModel):
     total: int
     items: list[GalleryItemOut]
+
+
+class AdminGalleryItemOut(GalleryItemOut):
+    api_key_id: int
+    api_key_name: str
+
+
+class AdminGalleryListOut(BaseModel):
+    total: int
+    items: list[AdminGalleryItemOut]

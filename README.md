@@ -6,12 +6,13 @@
 
 ## 功能
 
-- 用户：秘钥登录、对话式文生图、基于上图多轮改图、剩余额度
+- 用户：秘钥登录、对话式文生图、基于上图多轮改图、模型选择、剩余额度
 - 管理：
   - 单口令登录
   - **上游配置**（Base URL / API Key / 默认模型 / response_format）存 SQLite
+  - WebDAV 图片存储配置与全部生成图片浏览
   - 创建/禁用秘钥、设置额度、用量记录
-- 上游：`/v1/images/generations`、`/v1/images/edits`；成功按张扣额度
+- 上游：普通模型使用 `/v1/images/generations`、`/v1/images/edits`；`grok-imagine-image` 使用 `/v1/responses`；成功按张扣额度
 
 ## Docker（单容器）
 
@@ -25,9 +26,11 @@ docker compose up -d --build
 浏览器：`http://localhost:8080`
 
 1. `/admin/login` 用 `ADMIN_PASSWORD` 登录  
-2. **上游连接** 填 Base URL、API Key、默认模型  
+2. **上游连接** 填 Base URL、API Key、默认模型（可选 `grok-imagine-image`）
 3. 创建用户秘钥  
 4. 用户用秘钥登录生图  
+
+若要将生成图保存至 WebDAV，在管理后台的 **WebDAV 存储** 填写地址、账号、密码和远端目录。远端目录留空时，图片保存至 `image-portal/YYYY-MM-DD/`；填写时用该目录替代 `image-portal`。图片展示地址默认使用 WebDAV 地址；当 WebDAV 地址不适合浏览器直接访问时，填写映射到同一目录的 **公开访问基址**。
 
 镜像：多阶段构建前端 → 拷入 Python 镜像，由 FastAPI 托管静态 + `/api`。
 
@@ -105,7 +108,8 @@ uvicorn app.main:app --reload --port 8000
 | CRUD | `/api/conversations` | 会话 |
 | POST | `/api/generate` | 文生图 |
 | POST | `/api/edit` | 改图 |
-| GET/DELETE | `/api/gallery` | 用户图库（本地持久化） |
+| GET/DELETE | `/api/gallery` | 用户图库（本地或 WebDAV 持久化） |
+| GET | `/api/admin/images` | 管理员查看全部生成图片 |
 
 ## 注意
 

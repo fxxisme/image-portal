@@ -1,24 +1,28 @@
 import secrets
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth import create_token, hash_api_key, require_admin
 from app.config import get_settings
 from app.database import get_db
-from app.models import ApiKey, UsageLog
+from app.models import ApiKey, GeneratedImage, UsageLog
 from app.schemas import (
     AdminLoginRequest,
     ApiKeyCreate,
     ApiKeyCreated,
     ApiKeyOut,
     ApiKeyUpdate,
+    AdminGalleryItemOut,
+    AdminGalleryListOut,
     SystemSettingsOut,
     SystemSettingsUpdate,
     TokenResponse,
     UsageLogOut,
 )
 from app.services.settings import apply_settings_update, get_or_create_settings, mask_api_key
+from app.services.media import load_generated_image_bytes
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 settings = get_settings()
@@ -31,6 +35,12 @@ def _settings_out(row) -> SystemSettingsOut:
         has_upstream_api_key=bool((row.upstream_api_key or "").strip()),
         default_model=row.default_model or "gpt-image-2",
         response_format=row.response_format or "url",
+        webdav_url=row.webdav_url or "",
+        webdav_username=row.webdav_username or "",
+        webdav_password_masked=mask_api_key(row.webdav_password or ""),
+        has_webdav_password=bool((row.webdav_password or "").strip()),
+        webdav_path=row.webdav_path or "",
+        webdav_public_base_url=row.webdav_public_base_url or "",
         updated_at=row.updated_at,
     )
 
@@ -67,6 +77,11 @@ def update_settings_api(
         upstream_api_key=body.upstream_api_key,
         default_model=body.default_model,
         response_format=body.response_format,
+        webdav_url=body.webdav_url,
+        webdav_username=body.webdav_username,
+        webdav_password=body.webdav_password,
+        webdav_path=body.webdav_path,
+        webdav_public_base_url=body.webdav_public_base_url,
     )
     return _settings_out(row)
 
@@ -159,3 +174,58 @@ def list_usage(
     if api_key_id is not None:
         q = q.filter(UsageLog.api_key_id == api_key_id)
     return q.limit(limit).all()
+
+
+@router.get("/images", response_model=AdminGalleryListOut)
+def list_all_images(
+    _: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=48, ge=1, le=100),
+    api_key_id: int | None = None,
+) -> AdminGalleryListOut:
+    q = db.query(GeneratedImage).order_by(GeneratedImage.id.desc())
+    if api_key_id is not None:
+        q = q.filter(GeneratedImage.api_key_id == api_key_id)
+    total = q.count()
+    rows = q.offset(offset).limit(limit).all()
+    return AdminGalleryListOut(
+        total=total,
+        items=[
+            AdminGalleryItemOut(
+                id=row.id,
+                public_url=row.public_url,
+                prompt=row.prompt,
+                action=row.action,
+                conversation_id=row.conversation_id,
+                created_at=row.created_at,
+                api_key_id=row.api_key_id,
+                api_key_name=row.api_key.name if row.api_key else "已删除用户",
+            )
+            for row in rows
+        ],
+    )
+
+
+@router.get("/images/{image_id}/download")
+def download_image(
+    image_id: int,
+    _: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> Response:
+    row = db.get(GeneratedImage, image_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="图片不存在")
+    try:
+        content, media_type = load_generated_image_bytes(db, row)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="图片文件不存在") from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"读取图片失败: {exc}") from exc
+
+    filename = Path(row.storage_path).name or f"image-{row.id}.png"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

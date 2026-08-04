@@ -14,6 +14,11 @@ def get_or_create_settings(db: Session) -> SystemSetting:
             upstream_api_key="",
             default_model="gpt-image-2",
             response_format="url",
+            webdav_url="",
+            webdav_username="",
+            webdav_password="",
+            webdav_path="",
+            webdav_public_base_url="",
         )
         db.add(row)
         db.commit()
@@ -37,6 +42,11 @@ def apply_settings_update(
     upstream_api_key: str | None = None,
     default_model: str | None = None,
     response_format: str | None = None,
+    webdav_url: str | None = None,
+    webdav_username: str | None = None,
+    webdav_password: str | None = None,
+    webdav_path: str | None = None,
+    webdav_public_base_url: str | None = None,
 ) -> SystemSetting:
     row = get_or_create_settings(db)
     if upstream_base_url is not None:
@@ -48,6 +58,16 @@ def apply_settings_update(
         row.default_model = default_model.strip() or "gpt-image-2"
     if response_format is not None:
         row.response_format = response_format.strip() or "url"
+    if webdav_url is not None:
+        row.webdav_url = webdav_url.strip().rstrip("/")
+    if webdav_username is not None:
+        row.webdav_username = webdav_username.strip()
+    if webdav_password is not None and webdav_password.strip() != "":
+        row.webdav_password = webdav_password.strip()
+    if webdav_path is not None:
+        row.webdav_path = webdav_path.strip().strip("/")
+    if webdav_public_base_url is not None:
+        row.webdav_public_base_url = webdav_public_base_url.strip().rstrip("/")
     row.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)

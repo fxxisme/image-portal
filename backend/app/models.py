@@ -102,6 +102,12 @@ class SystemSetting(Base):
     upstream_api_key: Mapped[str] = mapped_column(Text, nullable=False, default="")
     default_model: Mapped[str] = mapped_column(String(128), nullable=False, default="gpt-image-2")
     response_format: Mapped[str] = mapped_column(String(32), nullable=False, default="url")
+    # 留空时继续使用本地 media；配置后生成结果上传至 WebDAV。
+    webdav_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    webdav_username: Mapped[str] = mapped_column(String(256), nullable=False, default="")
+    webdav_password: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    webdav_path: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    webdav_public_base_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
@@ -117,9 +123,11 @@ class GeneratedImage(Base):
     # generate | edit
     action: Mapped[str] = mapped_column(String(32), nullable=False, default="generate")
     prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    # 相对 media 根目录，如 {api_key_id}/{uuid}.png
+    # 相对存储根目录，如 {api_key_id}/{uuid}.png
     storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
-    # 对外访问路径 /media/...
+    # local | webdav，用于删除时定位实际存储。
+    storage_backend: Mapped[str] = mapped_column(String(32), nullable=False, default="local")
+    # 对外访问路径（本地 /media/... 或 WebDAV 公共 URL）
     public_url: Mapped[str] = mapped_column(String(512), nullable=False)
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

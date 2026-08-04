@@ -1,5 +1,9 @@
 const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 
+export function apiUrl(path) {
+  return `${API_BASE}${path}`;
+}
+
 export class ApiError extends Error {
   constructor(message, status, body) {
     super(message);
@@ -22,7 +26,7 @@ export async function request(path, { method = "GET", token, body, signal } = {}
     init.body = JSON.stringify(body);
   }
 
-  const res = await fetch(`${API_BASE}${path}`, init);
+  const res = await fetch(apiUrl(path), init);
   const text = await res.text();
   let data = null;
   try {

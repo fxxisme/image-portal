@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,6 +24,8 @@ from app.services.settings import get_or_create_settings
 logger = logging.getLogger(__name__)
 
 _MAX_REDIRECTS = 3
+_DATA_IMAGE_RE = re.compile(r"data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+")
+_HTTP_URL_RE = re.compile(r"https?://[^\s\"'<>)}\]]+")
 
 
 class UpstreamError(Exception):
@@ -105,8 +108,17 @@ async def images_generations(
     _require_config(cfg)
 
     base = normalize_base(cfg.base_url)
-    endpoint = f"{base}/v1/images/generations"
     use_model = (model or cfg.default_model).strip() or cfg.default_model
+    if use_model == "grok-imagine-image":
+        return await _grok_imagine_generations(
+            base=base,
+            api_key=cfg.api_key,
+            prompt=prompt,
+            n=n,
+            response_format=response_format,
+        )
+
+    endpoint = f"{base}/v1/images/generations"
     fmt = response_format or cfg.response_format or "url"
 
     body: dict[str, Any] = {
@@ -129,6 +141,29 @@ async def images_generations(
     return _extract_urls(res)
 
 
+async def _grok_imagine_generations(
+    *,
+    base: str,
+    api_key: str,
+    prompt: str,
+    n: int,
+    response_format: str | None,
+) -> list[str]:
+    """按 Grok 兼容服务的 responses 协议文生图。"""
+    endpoint = f"{base}/v1/responses"
+    body: dict[str, Any] = {"model": "grok-imagine-image", "input": prompt}
+    if n != 1:
+        body["n"] = n
+    if response_format:
+        body["response_format"] = response_format
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+    logger.info("upstream grok image generation %s n=%s", endpoint, n)
+    return _extract_grok_images(await _post_json(endpoint, headers=headers, json=body))
+
+
 async def images_edits(
     db: Session,
     *,
@@ -144,6 +179,8 @@ async def images_edits(
     base = normalize_base(cfg.base_url)
     endpoint = f"{base}/v1/images/edits"
     use_model = (model or cfg.default_model).strip() or cfg.default_model
+    if use_model == "grok-imagine-image":
+        raise UpstreamError("grok-imagine-image 当前仅支持文生图，不支持改图")
     fmt = response_format or cfg.response_format or "url"
 
     body: dict[str, Any] = {
@@ -198,4 +235,50 @@ def _extract_urls(res: httpx.Response) -> list[str]:
 
     if not urls:
         raise UpstreamError("上游 data 中无 url/b64_json", body=data)
+    return urls
+
+
+def _extract_grok_images(res: httpx.Response) -> list[str]:
+    text = res.text
+    try:
+        data = res.json() if text else None
+    except Exception:
+        data = None
+    if res.status_code >= 400:
+        raise UpstreamError(
+            f"上游返回 HTTP {res.status_code}",
+            status_code=res.status_code,
+            body=data if data is not None else text,
+        )
+
+    found: list[str] = []
+
+    def visit(value: Any, key: str = "") -> None:
+        if isinstance(value, str):
+            if value.startswith("data:image/"):
+                found.append(value)
+            elif key == "b64_json":
+                found.append(f"data:image/png;base64,{value}")
+            else:
+                for url in _HTTP_URL_RE.findall(value):
+                    if (
+                        key in {"url", "image_url", "source_url"}
+                        or re.search(r"\.(?:png|jpe?g|webp|gif|avif)(?:\?|$)", url, re.I)
+                        or re.search(r"image|asset|cdn|storage|oaiusercontent|xai", url, re.I)
+                    ):
+                        found.append(url)
+                found.extend(_DATA_IMAGE_RE.findall(value))
+            return
+        if isinstance(value, list):
+            for item in value:
+                visit(item)
+            return
+        if isinstance(value, dict):
+            for child_key, child_value in value.items():
+                visit(child_value, child_key)
+
+    visit(data)
+    urls = list(dict.fromkeys(found))
+    if not urls:
+        raise UpstreamError("Grok 上游成功但未解析到图片", body=data)
     return urls
