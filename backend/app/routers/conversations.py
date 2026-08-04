@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_api_key
 from app.database import get_db
-from app.models import ApiKey, Conversation
+from app.models import ApiKey, Conversation, GeneratedImage
 from app.schemas import ConversationCreate, ConversationDetail, ConversationOut
+from app.services.media import image_content_url
 from app.services.messages import message_to_out
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
@@ -52,12 +53,33 @@ def get_conversation(
     )
     if not item:
         raise HTTPException(status_code=404, detail="会话不存在")
+    message_ids = [message.id for message in item.messages]
+    image_rows = (
+        db.query(GeneratedImage)
+        .filter(GeneratedImage.message_id.in_(message_ids))
+        .order_by(GeneratedImage.id.asc())
+        .all()
+        if message_ids
+        else []
+    )
+    images_by_message: dict[int, list[GeneratedImage]] = {}
+    for image in image_rows:
+        if image.message_id is not None:
+            images_by_message.setdefault(image.message_id, []).append(image)
+
+    messages = []
+    for message in item.messages:
+        output = message_to_out(message)
+        if message.id in images_by_message:
+            output.image_urls = [image_content_url(image) for image in images_by_message[message.id]]
+        messages.append(output)
+
     return ConversationDetail(
         id=item.id,
         title=item.title,
         created_at=item.created_at,
         updated_at=item.updated_at,
-        messages=[message_to_out(m) for m in item.messages],
+        messages=messages,
     )
 
 

@@ -1,18 +1,28 @@
+import base64
 from datetime import datetime, timezone
+import logging
+import re
+from urllib.parse import parse_qs, urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_api_key
 from app.database import get_db
-from app.models import ApiKey, Conversation, Message, UsageLog
+from app.models import ApiKey, Conversation, GeneratedImage, Message, UsageLog
 from app.schemas import EditRequest, GenerateRequest, GenerateResponse
-from app.services.media import persist_generated_images
+from app.services.media import (
+    has_valid_image_signature,
+    load_generated_image_bytes,
+    persist_generated_images,
+)
 from app.services.messages import dump_urls, message_to_out
 from app.services.settings import get_or_create_settings
 from app.services.upstream import UpstreamError, images_edits, images_generations
 
 router = APIRouter(prefix="/api", tags=["images"])
+logger = logging.getLogger(__name__)
+_GALLERY_CONTENT_PATH_RE = re.compile(r"^/api/gallery/(\d+)/content$")
 
 
 def _get_owned_conversation(db: Session, api_key: ApiKey, conversation_id: int) -> Conversation:
@@ -43,6 +53,35 @@ def _maybe_title(conv: Conversation, prompt: str) -> None:
         conv.title = prompt.strip()[:40]
 
 
+def _upstream_error_detail(exc: UpstreamError) -> str:
+    if exc.status_code:
+        return f"上游服务错误（HTTP {exc.status_code}）"
+    return str(exc)
+
+
+def _resolve_edit_image(db: Session, api_key: ApiKey, image_url: str) -> str:
+    """将图库受控地址转为 data URL，供上游改图接口读取。"""
+    parsed = urlparse(image_url)
+    match = _GALLERY_CONTENT_PATH_RE.match(parsed.path)
+    if not match:
+        return image_url
+    row = (
+        db.query(GeneratedImage)
+        .filter(GeneratedImage.id == int(match.group(1)), GeneratedImage.api_key_id == api_key.id)
+        .first()
+    )
+    sig = parse_qs(parsed.query).get("sig", [""])[0]
+    if not row or not has_valid_image_signature(row, sig):
+        raise HTTPException(status_code=404, detail="参考图不存在")
+    try:
+        raw, media_type = load_generated_image_bytes(db, row)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="参考图文件不存在") from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail="参考图暂时无法读取") from exc
+    return f"data:{media_type};base64,{base64.b64encode(raw).decode()}"
+
+
 @router.post("/generate", response_model=GenerateResponse)
 async def generate(
     body: GenerateRequest,
@@ -68,6 +107,7 @@ async def generate(
     try:
         urls = await images_generations(db, prompt=body.prompt, model=model, n=body.n)
     except UpstreamError as exc:
+        logger.warning("image generation upstream error: %s body=%r", exc, exc.body)
         db.add(
             UsageLog(
                 api_key_id=api_key.id,
@@ -80,7 +120,7 @@ async def generate(
             )
         )
         db.commit()
-        raise HTTPException(status_code=502, detail={"message": str(exc), "body": exc.body}) from exc
+        raise HTTPException(status_code=502, detail=_upstream_error_detail(exc)) from exc
 
     cost = len(urls) or body.n
     api_key.quota_used += cost
@@ -106,6 +146,8 @@ async def generate(
         urls=urls,
     )
     assistant.image_urls = dump_urls(stored)
+    if len(stored) != len(urls):
+        assistant.content = f"已生成 {len(urls)} 张图片，其中 {len(stored)} 张已保存并可展示"
 
     db.add(
         UsageLog(
@@ -156,15 +198,17 @@ async def edit(
     db.add(user_msg)
     db.flush()
 
+    resolved_image_url = _resolve_edit_image(db, api_key, body.image_url)
     try:
         urls = await images_edits(
             db,
             prompt=body.prompt,
-            image_url=body.image_url,
+            image_url=resolved_image_url,
             model=model,
             n=body.n,
         )
     except UpstreamError as exc:
+        logger.warning("image edit upstream error: %s body=%r", exc, exc.body)
         db.add(
             UsageLog(
                 api_key_id=api_key.id,
@@ -177,7 +221,7 @@ async def edit(
             )
         )
         db.commit()
-        raise HTTPException(status_code=502, detail={"message": str(exc), "body": exc.body}) from exc
+        raise HTTPException(status_code=502, detail=_upstream_error_detail(exc)) from exc
 
     cost = len(urls) or body.n
     api_key.quota_used += cost
@@ -204,6 +248,8 @@ async def edit(
         urls=urls,
     )
     assistant.image_urls = dump_urls(stored)
+    if len(stored) != len(urls):
+        assistant.content = f"已编辑生成 {len(urls)} 张图片，其中 {len(stored)} 张已保存并可展示"
 
     db.add(
         UsageLog(

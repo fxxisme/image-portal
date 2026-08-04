@@ -22,7 +22,7 @@ from app.schemas import (
     UsageLogOut,
 )
 from app.services.settings import apply_settings_update, get_or_create_settings, mask_api_key
-from app.services.media import load_generated_image_bytes
+from app.services.media import image_content_url, load_generated_image_bytes
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 settings = get_settings()
@@ -194,7 +194,7 @@ def list_all_images(
         items=[
             AdminGalleryItemOut(
                 id=row.id,
-                public_url=row.public_url,
+                public_url=image_content_url(row),
                 prompt=row.prompt,
                 action=row.action,
                 conversation_id=row.conversation_id,

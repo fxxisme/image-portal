@@ -172,6 +172,17 @@ function scrollBottom() {
   if (el) el.scrollTop = el.scrollHeight;
 }
 
+function retryImage(event) {
+  const image = event.currentTarget;
+  const retries = Number(image.dataset.retries || "0");
+  if (retries >= 1) return;
+  image.dataset.retries = String(retries + 1);
+  window.setTimeout(() => {
+    const separator = image.src.includes("?") ? "&" : "?";
+    image.src = `${image.src}${separator}retry=${Date.now()}`;
+  }, 800);
+}
+
 async function send() {
   const text = prompt.value.trim();
   if (!text || sending.value) return;
@@ -233,17 +244,7 @@ async function send() {
     await nextTick();
     scrollBottom();
   } catch (e) {
-    // 保留用户消息，追加一条助手风格的错误消息
-    let detail = e.message || String(e);
-    try {
-      if (e.body?.detail?.body) {
-        detail += "\n\n" + JSON.stringify(e.body.detail.body, null, 2);
-      } else if (e.body) {
-        detail += "\n\n" + JSON.stringify(e.body, null, 2);
-      }
-    } catch {
-      // ignore
-    }
+    const detail = e.message || String(e);
     messages.value.push({
       id: "error-" + Date.now(),
       role: "assistant",
@@ -361,7 +362,7 @@ onMounted(async () => {
             <div v-if="m.image_urls?.length" class="imgs">
               <div v-for="(url, idx) in m.image_urls" :key="idx" class="img-card">
                 <a :href="url" target="_blank" rel="noopener">
-                  <img :src="url" :alt="'image-' + idx" loading="lazy" />
+                  <img :src="url" :alt="'image-' + idx" loading="lazy" @error="retryImage" />
                 </a>
               </div>
             </div>

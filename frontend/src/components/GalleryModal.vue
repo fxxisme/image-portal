@@ -62,6 +62,17 @@ function onKey(e) {
   if (e.key === "Escape") emit("close");
 }
 
+function retryImage(event) {
+  const image = event.currentTarget;
+  const retries = Number(image.dataset.retries || "0");
+  if (retries >= 1) return;
+  image.dataset.retries = String(retries + 1);
+  window.setTimeout(() => {
+    const separator = image.src.includes("?") ? "&" : "?";
+    image.src = `${image.src}${separator}retry=${Date.now()}`;
+  }, 800);
+}
+
 watch(
   () => props.open,
   (v) => {
@@ -85,7 +96,7 @@ onMounted(() => {
       <header class="head">
         <div>
           <div class="h-title">我的图库</div>
-          <div class="muted tiny">共 {{ total }} 张 · 已保存到本站</div>
+          <div class="muted tiny">共 {{ total }} 张 · 已持久化保存</div>
         </div>
         <div class="head-btns">
           <button class="ghost" type="button" :disabled="loading" @click="load(true)">刷新</button>
@@ -101,7 +112,7 @@ onMounted(() => {
         <div v-else class="grid">
           <div v-for="it in items" :key="it.id" class="cell">
             <a :href="it.public_url" target="_blank" rel="noopener">
-              <img :src="it.public_url" :alt="it.prompt || 'image'" loading="lazy" />
+              <img :src="it.public_url" :alt="it.prompt || 'image'" loading="lazy" @error="retryImage" />
             </a>
             <div class="cap">
               <div class="prompt" :title="it.prompt">{{ it.prompt || "（无描述）" }}</div>

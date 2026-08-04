@@ -16,6 +16,12 @@ function authHeader(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function conciseError(message, status) {
+  const raw = String(message || "").trim();
+  if (/<(?:!doctype|html|head|body)\b/i.test(raw)) return `请求失败（HTTP ${status}）`;
+  return raw || `HTTP ${status}`;
+}
+
 export async function request(path, { method = "GET", token, body, signal } = {}) {
   const headers = {
     ...authHeader(token),
@@ -38,12 +44,12 @@ export async function request(path, { method = "GET", token, body, signal } = {}
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     if (data && typeof data === "object") {
-      if (typeof data.detail === "string") msg = data.detail;
+      if (typeof data.detail === "string") msg = conciseError(data.detail, res.status);
       else if (data.detail?.message) msg = data.detail.message;
       else if (data.detail) msg = JSON.stringify(data.detail);
       else msg = JSON.stringify(data);
     } else if (typeof data === "string" && data) {
-      msg = data;
+      msg = conciseError(data, res.status);
     }
     throw new ApiError(msg, res.status, data);
   }

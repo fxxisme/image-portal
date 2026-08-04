@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import base64
+import asyncio
+import hashlib
+import hmac
 import logging
 import mimetypes
 import re
@@ -67,20 +70,42 @@ async def _fetch_bytes(url: str) -> tuple[bytes, str]:
             raise ValueError("本地 media 文件不存在")
         return path.read_bytes(), path.suffix or ".png"
 
+    last_error: Exception | None = None
     async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
-        res = await client.get(url)
-        res.raise_for_status()
-        ct = res.headers.get("content-type")
-        ext = _ext_from_content_type(ct)
-        # 尝试从 URL 猜扩展名
-        path_ext = Path(urlparse(url).path).suffix.lower()
-        if path_ext in {".png", ".jpg", ".jpeg", ".webp", ".gif"}:
-            ext = ".jpg" if path_ext == ".jpeg" else path_ext
-        return res.content, ext
+        for attempt in range(3):
+            try:
+                res = await client.get(url)
+                res.raise_for_status()
+                ct = res.headers.get("content-type", "")
+                if "text/html" in ct.lower() or res.content.lstrip().lower().startswith(b"<!doctype html"):
+                    raise ValueError("上游图片地址返回了 HTML 页面")
+                ext = _ext_from_content_type(ct)
+                path_ext = Path(urlparse(url).path).suffix.lower()
+                if path_ext in {".png", ".jpg", ".jpeg", ".webp", ".gif"}:
+                    ext = ".jpg" if path_ext == ".jpeg" else path_ext
+                return res.content, ext
+            except (httpx.HTTPError, ValueError) as exc:
+                last_error = exc
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+    raise ValueError("下载上游图片失败，已重试 3 次") from last_error
 
 
 def _webdav_url(base_url: str, path: str) -> str:
     return f"{base_url.rstrip('/')}/{quote(path.strip('/'), safe='/')}"
+
+
+def image_content_url(row: GeneratedImage) -> str:
+    """生成不可枚举伪造的图片访问地址，供 img 标签直接读取。"""
+    payload = f"gallery-image:{row.id}:{row.api_key_id}".encode()
+    secret = get_settings().jwt_secret.encode()
+    signature = hmac.new(secret, payload, hashlib.sha256).hexdigest()
+    return f"/api/gallery/{row.id}/content?sig={signature}"
+
+
+def has_valid_image_signature(row: GeneratedImage, signature: str) -> bool:
+    expected = image_content_url(row).rsplit("sig=", 1)[-1]
+    return hmac.compare_digest(expected, signature or "")
 
 
 def _webdav_storage_path(root_path: str, name: str) -> str:
@@ -163,10 +188,28 @@ def load_generated_image_bytes(db: Session, row: GeneratedImage) -> tuple[bytes,
             if settings_row.webdav_username
             else None
         )
+        last_error: httpx.HTTPError | None = None
+        response: httpx.Response | None = None
         with httpx.Client(timeout=120, auth=auth, follow_redirects=True) as client:
-            response = client.get(_webdav_url(base_url, row.storage_path))
-            response.raise_for_status()
+            for _ in range(3):
+                try:
+                    response = client.get(_webdav_url(base_url, row.storage_path))
+                    response.raise_for_status()
+                    break
+                except httpx.HTTPError as exc:
+                    last_error = exc
+            else:
+                if (
+                    isinstance(last_error, httpx.HTTPStatusError)
+                    and last_error.response.status_code == 404
+                ):
+                    raise FileNotFoundError("WebDAV 图片不存在") from last_error
+                raise RuntimeError("WebDAV 图片暂时无法读取") from last_error
+        if response is None:
+            raise FileNotFoundError("WebDAV 图片读取失败")
         media_type = response.headers.get("content-type", "").split(";", 1)[0]
+        if "text/html" in media_type.lower() or response.content.lstrip().lower().startswith(b"<!doctype html"):
+            raise RuntimeError("WebDAV 返回了 HTML 错误页面")
         if not media_type.startswith("image/"):
             media_type = mimetypes.guess_type(row.storage_path)[0] or "application/octet-stream"
         return response.content, media_type
@@ -234,11 +277,11 @@ async def persist_generated_images(
                 source_url=(src[:2000] if not src.startswith("data:") else None),
             )
             db.add(row)
-            public_urls.append(public)
+            db.flush()
+            public_urls.append(image_content_url(row))
         except Exception:
             logger.exception("persist image failed api_key=%s src_prefix=%s", api_key_id, src[:80])
-            # 落盘失败仍返回原 URL，对话可用；图库可能缺这条
-            public_urls.append(src)
+            # 不返回上游原始 URL，避免将 Cloudflare 等 HTML 错页作为图片展示。
 
     db.flush()
     return public_urls
