@@ -184,8 +184,7 @@ async def edit(
     conv = _get_owned_conversation(db, api_key, body.conversation_id)
     _ensure_quota(api_key, body.n)
 
-    sys = get_or_create_settings(db)
-    model = (body.model or sys.default_model or "gpt-image-2").strip()
+    model = "gpt-image-2"
     user_msg = Message(
         conversation_id=conv.id,
         role="user",

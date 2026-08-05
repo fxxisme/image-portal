@@ -12,7 +12,7 @@
   - **上游配置**（Base URL / API Key / 默认模型 / response_format）存 SQLite
   - WebDAV 图片存储配置与全部生成图片浏览
   - 创建/禁用秘钥、设置额度、用量记录
-- 上游：普通模型使用 `/v1/images/generations`、`/v1/images/edits`；`grok-imagine-image` 使用 `/v1/responses`；成功按张扣额度
+- 上游：文生图模型统一使用 `/v1/images/generations`；图生图固定使用 `gpt-image-2` 的 `/v1/images/edits`；成功按张扣额度
 
 ## Docker（单容器）
 
@@ -26,7 +26,7 @@ docker compose up -d --build
 浏览器：`http://localhost:8080`
 
 1. `/admin/login` 用 `ADMIN_PASSWORD` 登录  
-2. **上游连接** 填 Base URL、API Key、默认模型（可选 `grok-imagine-image`）
+2. **上游连接** 填 Base URL、API Key、默认模型（`gpt-image-2` 或 `grok-imagine-image`）
 3. 创建用户秘钥  
 4. 用户用秘钥登录生图  
 

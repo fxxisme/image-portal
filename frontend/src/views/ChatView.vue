@@ -20,19 +20,31 @@ const editPreview = ref("");
 const fileInput = ref(null);
 const scroller = ref(null);
 const galleryOpen = ref(false);
-const selectedModel = ref("");
+const generationMode = ref("text-to-image");
+const textModel = ref("gpt-image-2");
+const textToImageModels = ["gpt-image-2", "grok-imagine-image"];
 
-const modelOptions = computed(() => {
-  const configured = auth.me?.default_model || "gpt-image-2";
-  return [...new Set([configured, "gpt-image-2", "grok-imagine-image"])];
+const isEditMode = computed(() => generationMode.value === "image-to-image");
+const selectedModel = computed({
+  get: () => (isEditMode.value ? "gpt-image-2" : textModel.value),
+  set: (value) => {
+    if (textToImageModels.includes(value)) textModel.value = value;
+  },
 });
+const modelOptions = computed(() =>
+  isEditMode.value ? ["gpt-image-2"] : textToImageModels,
+);
+const canSend = computed(
+  () =>
+    !!prompt.value.trim() &&
+    !sending.value &&
+    (!isEditMode.value || !!editImageSrc.value),
+);
 
 const currentTitle = computed(() => {
   const c = conversations.value.find((x) => x.id === currentId.value);
   return c?.title || "对话生图";
 });
-
-const isEditMode = computed(() => !!editImageSrc.value);
 
 const quotaText = computed(() => {
   const rem = auth.me?.quota_remaining;
@@ -44,7 +56,9 @@ const quotaText = computed(() => {
 async function ensureMe() {
   try {
     await auth.fetchMe();
-    if (!selectedModel.value) selectedModel.value = auth.me?.default_model || "gpt-image-2";
+    if (textToImageModels.includes(auth.me?.default_model)) {
+      textModel.value = auth.me.default_model;
+    }
   } catch (e) {
     if (e.status === 401) {
       auth.logoutUser();
@@ -130,13 +144,20 @@ function selectConversation(id) {
 function useAsEditRef(url) {
   editImageSrc.value = url;
   editPreview.value = url;
+  generationMode.value = "image-to-image";
   galleryOpen.value = false;
 }
 
-function clearEditImage() {
+function clearEditImage({ resetMode = true } = {}) {
   editImageSrc.value = "";
   editPreview.value = "";
   if (fileInput.value) fileInput.value.value = "";
+  if (resetMode) generationMode.value = "text-to-image";
+}
+
+function setGenerationMode(mode) {
+  generationMode.value = mode;
+  if (mode === "text-to-image") clearEditImage({ resetMode: false });
 }
 
 function pickFile() {
@@ -160,6 +181,7 @@ function onFileChange(ev) {
     const dataUrl = String(reader.result || "");
     editImageSrc.value = dataUrl;
     editPreview.value = dataUrl;
+    generationMode.value = "image-to-image";
   };
   reader.onerror = () => {
     error.value = "读取图片失败";
@@ -186,6 +208,10 @@ function retryImage(event) {
 async function send() {
   const text = prompt.value.trim();
   if (!text || sending.value) return;
+  if (isEditMode.value && !editImageSrc.value) {
+    error.value = "图生图请先上传参考图";
+    return;
+  }
   if (!currentId.value) {
     await createConversation();
   }
@@ -203,7 +229,7 @@ async function send() {
   messages.value.push(optimisticUserMsg);
   prompt.value = "";
   const refImage = editImageSrc.value;
-  const refPreview = editPreview.value;
+  const requestModel = isEditMode.value ? "gpt-image-2" : selectedModel.value;
   clearEditImage();
   await nextTick();
   scrollBottom();
@@ -212,7 +238,7 @@ async function send() {
     conversation_id: currentId.value,
     prompt: text,
     n: 1,
-    model: selectedModel.value || auth.me?.default_model || "gpt-image-2",
+    model: requestModel,
   };
 
   try {
@@ -321,7 +347,7 @@ onMounted(async () => {
     <main class="main">
       <!-- top bar -->
       <header class="bar glass-bar">
-        <div>
+        <div class="bar-title">
           <div class="title">对话生图</div>
           <div class="sub muted">{{ quotaText }}</div>
         </div>
@@ -381,11 +407,40 @@ onMounted(async () => {
 
       <!-- ====== composer area (matching risk-1.html style) ====== -->
       <div class="composer-area">
-        <div v-if="isEditMode" class="edit-banner">
+        <div class="composer-toolbar">
+          <div class="composer-mode">
+            <div class="mode-switch" role="group" aria-label="生成类型">
+              <button
+                type="button"
+                class="mode-option"
+                :class="{ active: generationMode === 'text-to-image' }"
+                :aria-pressed="generationMode === 'text-to-image'"
+                @click="setGenerationMode('text-to-image')"
+              >
+                文生图
+              </button>
+              <button
+                type="button"
+                class="mode-option"
+                :class="{ active: generationMode === 'image-to-image' }"
+                :aria-pressed="generationMode === 'image-to-image'"
+                @click="setGenerationMode('image-to-image')"
+              >
+                图生图
+              </button>
+            </div>
+          </div>
+          <p class="hint">
+            <span class="hint-icon">ⓘ</span>
+            生成可能需要一些时间。失败不扣额度。
+          </p>
+        </div>
+
+        <div v-if="isEditMode && editImageSrc" class="edit-banner">
           <div class="edit-info">
             <img v-if="editPreview" class="edit-thumb" :src="editPreview" alt="参考" />
             <div>
-              <strong>改图模式</strong>
+              <strong>图生图</strong>
               <div class="muted tiny">将根据参考图与文字说明生成</div>
             </div>
           </div>
@@ -393,7 +448,13 @@ onMounted(async () => {
         </div>
 
         <div class="input-row glass-panel">
-          <button class="attach-btn" type="button" title="上传参考图" @click="pickFile">
+          <button
+            v-if="isEditMode"
+            class="attach-btn"
+            type="button"
+            :title="isEditMode ? '上传参考图' : '上传参考图并切换到图生图'"
+            @click="pickFile"
+          >
             <span class="attach-icon">＋</span>
           </button>
           <input
@@ -405,7 +466,13 @@ onMounted(async () => {
           />
           <textarea
             v-model="prompt"
-            :placeholder="isEditMode ? '描述如何修改这张图…' : '描述你想生成的图片…'"
+            :placeholder="
+              isEditMode
+                ? editImageSrc
+                  ? '描述如何修改这张图…'
+                  : '先上传参考图，再描述修改方式…'
+                : '描述你想生成的图片…'
+            "
             @keydown.enter.exact.prevent="send"
             rows="1"
           />
@@ -417,7 +484,7 @@ onMounted(async () => {
           <button
             class="send-btn"
             type="button"
-            :disabled="sending || !prompt.trim()"
+            :disabled="!canSend"
             @click="send"
           >
             <span>{{ sending ? "生成中…" : isEditMode ? "提交改图" : "生成" }}</span>
@@ -425,10 +492,6 @@ onMounted(async () => {
           </button>
         </div>
 
-        <p class="hint">
-          <span class="hint-icon">ⓘ</span>
-          生成可能需要一些时间。失败不扣额度。
-        </p>
       </div>
     </main>
   </div>
@@ -574,8 +637,8 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: flex-start;
-  padding: 14px 20px;
+  align-items: center;
+  padding: 10px 20px;
   border-bottom: 1px solid rgba(149, 142, 160, 0.12);
 }
 .glass-bar {
@@ -587,15 +650,23 @@ onMounted(async () => {
   font-weight: 700;
   font-family: var(--font-display);
 }
+.bar-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
 .sub {
   font-size: 12px;
-  margin-top: 2px;
+  margin-top: 0;
+  white-space: nowrap;
 }
 .bar-actions {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
+  flex-shrink: 0;
 }
 .ban {
   margin: 10px 18px 0;
@@ -605,7 +676,7 @@ onMounted(async () => {
 .messages {
   flex: 1;
   overflow: auto;
-  padding: 24px 20px;
+  padding: 18px 20px;
 }
 .center {
   text-align: center;
@@ -686,12 +757,56 @@ onMounted(async () => {
 
 /* ========= composer area (risk-1.html inspired) ========= */
 .composer-area {
-  padding: 48px 24px 24px;
+  padding: 14px 24px 12px;
   background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 10px;
+}
+
+.composer-toolbar {
+  width: 100%;
+  max-width: 56rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 16px;
+  min-height: 32px;
+}
+.composer-mode {
+  width: auto;
+  max-width: none;
+  display: flex;
+  align-items: center;
+}
+.mode-switch {
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid rgba(149, 142, 160, 0.18);
+  border-radius: 0.75rem;
+  background: rgba(11, 19, 38, 0.58);
+}
+.mode-option {
+  min-width: 88px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.mode-option:hover { color: var(--text); }
+.mode-option.active {
+  background: rgba(208, 188, 255, 0.16);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(208, 188, 255, 0.24);
+}
+.mode-option:focus-visible {
+  outline: 2px solid rgba(208, 188, 255, 0.7);
+  outline-offset: 2px;
 }
 
 .edit-banner {
@@ -701,8 +816,8 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 10px;
   align-items: center;
-  margin-bottom: 4px;
-  padding: 10px 16px;
+  margin-bottom: 0;
+  padding: 8px 12px;
   border-radius: 0.75rem;
   border: 1px solid rgba(61, 214, 140, 0.3);
   background: rgba(61, 214, 140, 0.08);
@@ -766,8 +881,8 @@ onMounted(async () => {
 
 .input-row textarea {
   flex: 1;
-  min-height: 80px;
-  max-height: 200px;
+  min-height: 56px;
+  max-height: 160px;
   border: none;
   background: transparent;
   padding: 10px 0;
@@ -824,11 +939,13 @@ onMounted(async () => {
 .hidden-file { display: none; }
 
 .hint {
+  margin: 0;
   font-size: 12px;
   color: rgba(203, 195, 215, 0.5);
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 .hint-icon {
   font-size: 13px;
@@ -867,12 +984,44 @@ onMounted(async () => {
   .sidebar {
     max-height: 200px;
   }
+  .bar {
+    align-items: flex-start;
+  }
+  .bar-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+  .sub {
+    margin-top: 2px;
+    white-space: normal;
+  }
+  .bar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
   .main {
     height: auto;
     min-height: calc(100vh - 200px);
   }
   .input-row {
     flex-wrap: wrap;
+  }
+  .composer-toolbar {
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .composer-mode,
+  .mode-switch {
+    width: 100%;
+  }
+  .hint {
+    width: 100%;
+    white-space: normal;
+  }
+  .mode-option {
+    flex: 1;
   }
   .input-row textarea {
     min-width: calc(100% - 56px);
