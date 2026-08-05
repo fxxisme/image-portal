@@ -14,6 +14,8 @@ const savingSettings = ref(false);
 const error = ref("");
 const settingsMsg = ref("");
 const createdKey = ref("");
+const copyingKey = ref(false);
+const copiedKey = ref(false);
 const images = ref([]);
 const imagesTotal = ref(0);
 const loadingImages = ref(false);
@@ -187,6 +189,7 @@ async function saveSettings() {
 async function createKey() {
   error.value = "";
   createdKey.value = "";
+  copiedKey.value = false;
   try {
     const item = await request("/api/admin/keys", {
       method: "POST",
@@ -255,9 +258,42 @@ function logout() {
   router.push({ name: "admin-login" });
 }
 
-function copyCreated() {
-  if (!createdKey.value) return;
-  navigator.clipboard?.writeText(createdKey.value);
+async function copyCreated() {
+  if (!createdKey.value || copyingKey.value) return;
+  copyingKey.value = true;
+  error.value = "";
+  try {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(createdKey.value);
+        copiedKey.value = true;
+        return;
+      } catch {
+        // Clipboard API may be unavailable on non-secure origins or without permission.
+      }
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = createdKey.value;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    let copied = false;
+    try {
+      textarea.select();
+      copied = document.execCommand("copy");
+    } finally {
+      textarea.remove();
+    }
+    if (!copied) throw new Error("copy failed");
+    copiedKey.value = true;
+  } catch {
+    copiedKey.value = false;
+    error.value = "复制失败，请手动选择秘钥复制";
+  } finally {
+    copyingKey.value = false;
+  }
 }
 
 onMounted(load);
@@ -457,7 +493,9 @@ onMounted(load);
       <div v-if="createdKey" class="created">
         <div class="ok">创建成功。明文秘钥仅显示一次，请立即复制发给用户：</div>
         <div class="mono keyline">{{ createdKey }}</div>
-        <button class="ghost" type="button" @click="copyCreated">复制</button>
+        <button class="ghost" type="button" :disabled="copyingKey" @click="copyCreated">
+          {{ copyingKey ? "复制中…" : copiedKey ? "已复制" : "复制" }}
+        </button>
       </div>
     </section>
 
