@@ -51,6 +51,8 @@ def _ensure_sqlite_columns() -> None:
             "webdav_password": "TEXT NOT NULL DEFAULT ''",
             "webdav_path": "TEXT NOT NULL DEFAULT ''",
             "webdav_public_base_url": "TEXT NOT NULL DEFAULT ''",
+            "text_to_image_models": "TEXT NOT NULL DEFAULT '[\"gpt-image-2\", \"grok-imagine-image\"]'",
+            "image_to_image_models": "TEXT NOT NULL DEFAULT '[\"gpt-image-2\"]'",
         },
         "generated_images": {
             "storage_backend": "TEXT NOT NULL DEFAULT 'local'",

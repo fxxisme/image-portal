@@ -17,7 +17,11 @@ from app.services.media import (
     persist_generated_images,
 )
 from app.services.messages import dump_urls, message_to_out
-from app.services.settings import get_or_create_settings
+from app.services.settings import (
+    get_image_to_image_models,
+    get_or_create_settings,
+    get_text_to_image_models,
+)
 from app.services.upstream import UpstreamError, images_edits, images_generations
 
 router = APIRouter(prefix="/api", tags=["images"])
@@ -92,7 +96,13 @@ async def generate(
     _ensure_quota(api_key, body.n)
 
     sys = get_or_create_settings(db)
-    model = (body.model or sys.default_model or "gpt-image-2").strip()
+    available_models = get_text_to_image_models(sys)
+    requested_model = (body.model or "").strip()
+    if requested_model and requested_model not in available_models:
+        raise HTTPException(status_code=400, detail="所选文生图模型不可用")
+    model = requested_model or (
+        sys.default_model if sys.default_model in available_models else available_models[0]
+    )
     user_msg = Message(
         conversation_id=conv.id,
         role="user",
@@ -184,7 +194,11 @@ async def edit(
     conv = _get_owned_conversation(db, api_key, body.conversation_id)
     _ensure_quota(api_key, body.n)
 
-    model = "gpt-image-2"
+    sys = get_or_create_settings(db)
+    available_models = get_image_to_image_models(sys)
+    model = (body.model or available_models[0]).strip()
+    if model not in available_models:
+        raise HTTPException(status_code=400, detail="所选图生图模型不可用")
     user_msg = Message(
         conversation_id=conv.id,
         role="user",

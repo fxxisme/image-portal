@@ -5,8 +5,8 @@
   Authorization: Bearer {apiKey}
   body: { model, prompt, messages, n, response_format }
 
-文生图模型统一使用 generations 接口；图生图固定使用
-gpt-image-2 的 /v1/images/edits 接口。
+文生图模型统一使用 generations 接口；图生图使用管理端配置的模型列表，
+调用 /v1/images/edits 接口。
 
 上游 base_url / api_key / default_model 从 SQLite 管理配置读取。
 """
@@ -65,6 +65,55 @@ def _require_config(cfg: UpstreamConfig) -> None:
         raise UpstreamError("未配置上游地址，请在管理后台填写 Upstream Base URL")
     if not cfg.api_key.strip():
         raise UpstreamError("未配置上游 API Key，请在管理后台填写")
+
+
+async def fetch_upstream_models(db: Session) -> list[str]:
+    cfg = load_upstream_config(db)
+    _require_config(cfg)
+
+    endpoint = f"{normalize_base(cfg.base_url)}/v1/models"
+    headers = {"Authorization": f"Bearer {cfg.api_key}"}
+    settings = get_settings()
+    try:
+        async with httpx.AsyncClient(
+            timeout=settings.upstream_timeout_seconds,
+            follow_redirects=True,
+        ) as client:
+            res = await client.get(endpoint, headers=headers)
+    except httpx.TimeoutException as exc:
+        raise UpstreamError("上游模型列表请求超时") from exc
+    except httpx.HTTPError as exc:
+        raise UpstreamError(f"上游模型列表请求失败: {exc}") from exc
+
+    try:
+        data = res.json() if res.text else None
+    except ValueError as exc:
+        raise UpstreamError("上游模型列表返回格式无效") from exc
+
+    if res.status_code >= 400:
+        detail = data if data is not None else res.text
+        raise UpstreamError(f"上游返回 HTTP {res.status_code}", res.status_code, detail)
+
+    candidates = data
+    if isinstance(data, dict):
+        candidates = data.get("data") or data.get("models") or []
+    if isinstance(candidates, dict):
+        candidates = candidates.get("data") or candidates.get("models") or []
+
+    names: list[str] = []
+    for item in candidates if isinstance(candidates, list) else []:
+        if isinstance(item, str):
+            name = item.strip()
+        elif isinstance(item, dict):
+            name = str(item.get("id") or item.get("name") or item.get("model") or "").strip()
+        else:
+            name = ""
+        if name and name not in names:
+            names.append(name)
+
+    if not names:
+        raise UpstreamError("上游未返回可用模型")
+    return names
 
 
 async def _post_json(url: str, *, headers: dict, json: dict) -> httpx.Response:
@@ -147,7 +196,7 @@ async def images_edits(
 
     base = normalize_base(cfg.base_url)
     endpoint = f"{base}/v1/images/edits"
-    use_model = "gpt-image-2"
+    use_model = (model or "gpt-image-2").strip() or "gpt-image-2"
     fmt = response_format or cfg.response_format or "url"
 
     body: dict[str, Any] = {

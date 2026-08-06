@@ -101,6 +101,12 @@ class SystemSetting(Base):
     upstream_base_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     upstream_api_key: Mapped[str] = mapped_column(Text, nullable=False, default="")
     default_model: Mapped[str] = mapped_column(String(128), nullable=False, default="gpt-image-2")
+    text_to_image_models: Mapped[str] = mapped_column(
+        Text, nullable=False, default='["gpt-image-2", "grok-imagine-image"]'
+    )
+    image_to_image_models: Mapped[str] = mapped_column(
+        Text, nullable=False, default='["gpt-image-2"]'
+    )
     response_format: Mapped[str] = mapped_column(String(32), nullable=False, default="url")
     # 留空时继续使用本地 media；配置后生成结果上传至 WebDAV。
     webdav_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")

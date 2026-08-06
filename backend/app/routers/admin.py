@@ -19,10 +19,18 @@ from app.schemas import (
     SystemSettingsOut,
     SystemSettingsUpdate,
     TokenResponse,
+    UpstreamModelsOut,
     UsageLogOut,
 )
-from app.services.settings import apply_settings_update, get_or_create_settings, mask_api_key
+from app.services.settings import (
+    apply_settings_update,
+    get_image_to_image_models,
+    get_or_create_settings,
+    get_text_to_image_models,
+    mask_api_key,
+)
 from app.services.media import image_content_url, load_generated_image_bytes
+from app.services.upstream import UpstreamError, fetch_upstream_models
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 settings = get_settings()
@@ -34,6 +42,8 @@ def _settings_out(row) -> SystemSettingsOut:
         upstream_api_key_masked=mask_api_key(row.upstream_api_key or ""),
         has_upstream_api_key=bool((row.upstream_api_key or "").strip()),
         default_model=row.default_model or "gpt-image-2",
+        text_to_image_models=get_text_to_image_models(row),
+        image_to_image_models=get_image_to_image_models(row),
         response_format=row.response_format or "url",
         webdav_url=row.webdav_url or "",
         webdav_username=row.webdav_username or "",
@@ -76,6 +86,8 @@ def update_settings_api(
         upstream_base_url=body.upstream_base_url,
         upstream_api_key=body.upstream_api_key,
         default_model=body.default_model,
+        text_to_image_models=body.text_to_image_models,
+        image_to_image_models=body.image_to_image_models,
         response_format=body.response_format,
         webdav_url=body.webdav_url,
         webdav_username=body.webdav_username,
@@ -84,6 +96,18 @@ def update_settings_api(
         webdav_public_base_url=body.webdav_public_base_url,
     )
     return _settings_out(row)
+
+
+@router.get("/upstream-models", response_model=UpstreamModelsOut)
+async def list_upstream_models(
+    _: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> UpstreamModelsOut:
+    try:
+        models = await fetch_upstream_models(db)
+    except UpstreamError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return UpstreamModelsOut(models=models)
 
 
 @router.get("/keys", response_model=list[ApiKeyOut])

@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { request } from "../api/http";
-import GalleryModal from "../components/GalleryModal.vue";
+import LoginModal from "../components/LoginModal.vue";
 import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();
@@ -19,21 +19,33 @@ const editImageSrc = ref("");
 const editPreview = ref("");
 const fileInput = ref(null);
 const scroller = ref(null);
-const galleryOpen = ref(false);
 const generationMode = ref("text-to-image");
-const textModel = ref("gpt-image-2");
-const textToImageModels = ["gpt-image-2", "grok-imagine-image"];
+const textModel = ref("");
+const editModel = ref("");
+const fallbackTextToImageModels = ["gpt-image-2", "grok-imagine-image"];
+const fallbackImageToImageModels = ["gpt-image-2"];
 let messageLoadSeq = 0;
 
 const isEditMode = computed(() => generationMode.value === "image-to-image");
+const textToImageModels = computed(() => {
+  const models = auth.me?.text_to_image_models;
+  return Array.isArray(models) && models.length ? models : fallbackTextToImageModels;
+});
+const imageToImageModels = computed(() => {
+  const models = auth.me?.image_to_image_models;
+  return Array.isArray(models) && models.length ? models : fallbackImageToImageModels;
+});
 const selectedModel = computed({
-  get: () => (isEditMode.value ? "gpt-image-2" : textModel.value),
+  get: () => (isEditMode.value ? editModel.value : textModel.value),
   set: (value) => {
-    if (textToImageModels.includes(value)) textModel.value = value;
+    const options = isEditMode.value ? imageToImageModels.value : textToImageModels.value;
+    if (!options.includes(value)) return;
+    if (isEditMode.value) editModel.value = value;
+    else textModel.value = value;
   },
 });
 const modelOptions = computed(() =>
-  isEditMode.value ? ["gpt-image-2"] : textToImageModels,
+  isEditMode.value ? imageToImageModels.value : textToImageModels.value,
 );
 const canSend = computed(
   () =>
@@ -42,11 +54,6 @@ const canSend = computed(
     (!isEditMode.value || !!editImageSrc.value),
 );
 
-const currentTitle = computed(() => {
-  const c = conversations.value.find((x) => x.id === currentId.value);
-  return c?.title || "对话生图";
-});
-
 const quotaText = computed(() => {
   const rem = auth.me?.quota_remaining;
   const total = auth.me?.quota_total;
@@ -54,12 +61,25 @@ const quotaText = computed(() => {
   return `已用 ${auth.me.quota_used ?? total - rem} / 共 ${total} 张 · 剩余 ${rem} 张`;
 });
 
+const showZeroWarning = computed(
+  () => auth.me?.quota_remaining != null && Number(auth.me.quota_remaining) === 0,
+);
+
+function syncModelSelections() {
+  if (!textToImageModels.value.includes(textModel.value)) {
+    textModel.value = textToImageModels.value.includes(auth.me?.default_model)
+      ? auth.me.default_model
+      : textToImageModels.value[0] || "";
+  }
+  if (!imageToImageModels.value.includes(editModel.value)) {
+    editModel.value = imageToImageModels.value[0] || "";
+  }
+}
+
 async function ensureMe() {
   try {
     await auth.fetchMe();
-    if (textToImageModels.includes(auth.me?.default_model)) {
-      textModel.value = auth.me.default_model;
-    }
+    syncModelSelections();
   } catch (e) {
     if (e.status === 401) {
       auth.logoutUser();
@@ -145,13 +165,6 @@ function selectConversation(id) {
   clearEditImage();
 }
 
-function useAsEditRef(url) {
-  editImageSrc.value = url;
-  editPreview.value = url;
-  generationMode.value = "image-to-image";
-  galleryOpen.value = false;
-}
-
 function clearEditImage({ resetMode = true } = {}) {
   editImageSrc.value = "";
   editPreview.value = "";
@@ -233,7 +246,7 @@ async function send() {
   messages.value.push(optimisticUserMsg);
   prompt.value = "";
   const refImage = editImageSrc.value;
-  const requestModel = isEditMode.value ? "gpt-image-2" : selectedModel.value;
+  const requestModel = selectedModel.value || undefined;
   clearEditImage();
   await nextTick();
   scrollBottom();
@@ -292,11 +305,6 @@ function logout() {
   router.push({ name: "login" });
 }
 
-function goLogin() {
-  auth.logoutUser();
-  router.push({ name: "login" });
-}
-
 watch(currentId, () => {
   loadMessages();
 });
@@ -308,6 +316,19 @@ onMounted(async () => {
     await createConversation();
   }
 });
+
+const showLoginModal = ref(false);
+
+const handleLoginSuccess = async () => {
+  showLoginModal.value = false;
+  error.value = "";
+  syncModelSelections();
+  currentId.value = null;
+  messages.value = [];
+  conversations.value = [];
+  await loadConversations();
+  if (!conversations.value.length) await createConversation();
+};
 </script>
 
 <template>
@@ -354,19 +375,27 @@ onMounted(async () => {
           <div class="sub muted">{{ quotaText }}</div>
         </div>
         <div class="bar-actions">
-          <button class="ghost" type="button" @click="galleryOpen = true">我的图库</button>
           <span class="badge">
             剩余 <strong>{{ auth.me?.quota_remaining ?? "-" }}</strong> 张
           </span>
+          <span v-if="showZeroWarning" class="badge warn">剩余 0 张</span>
+          <button
+            v-if="showZeroWarning"
+            class="ghost"
+            type="button"
+            @click="showLoginModal = true"
+          >
+            重新输入秘钥
+          </button>
           <span class="badge" v-if="auth.me?.name">{{ auth.me.name }}</span>
-          <button v-if="auth.isGuest" class="ghost" type="button" @click="goLogin">登录</button>
         </div>
       </header>
 
-      <GalleryModal
-        :open="galleryOpen"
-        @close="galleryOpen = false"
-        @use-edit="useAsEditRef"
+      <LoginModal
+        v-if="showLoginModal"
+        :show="showLoginModal"
+        @close="showLoginModal = false"
+        @success="handleLoginSuccess"
       />
 
       <div v-if="error" class="err ban">{{ error }}</div>

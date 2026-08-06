@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { apiUrl, request } from "../api/http";
 import { useAuthStore } from "../stores/auth";
@@ -19,6 +19,8 @@ const copiedKey = ref(false);
 const images = ref([]);
 const imagesTotal = ref(0);
 const loadingImages = ref(false);
+const availableModels = ref([]);
+const loadingModels = ref(false);
 const activeTab = ref("settings");
 const previewImage = ref(null);
 const downloadingImage = ref(false);
@@ -28,6 +30,8 @@ const settingsForm = ref({
   upstream_base_url: "",
   upstream_api_key: "",
   default_model: "gpt-image-2",
+  text_to_image_models: ["gpt-image-2", "grok-imagine-image"],
+  image_to_image_models: ["gpt-image-2"],
   response_format: "url",
   webdav_url: "",
   webdav_username: "",
@@ -41,6 +45,45 @@ const settingsMeta = ref({
   updated_at: null,
   has_webdav_password: false,
   webdav_password_masked: "",
+});
+
+function uniqueModels(...groups) {
+  const result = [];
+  for (const group of groups) {
+    for (const raw of group || []) {
+      const name = String(raw || "").trim();
+      if (name && !result.includes(name)) result.push(name);
+    }
+  }
+  return result;
+}
+
+const textModelChoices = computed(() => {
+  if (availableModels.value.length) {
+    return uniqueModels(
+      availableModels.value,
+      settingsForm.value.text_to_image_models,
+      [settingsForm.value.default_model],
+    );
+  }
+  return uniqueModels(
+    settingsForm.value.text_to_image_models,
+    [settingsForm.value.default_model],
+    ["gpt-image-2", "grok-imagine-image"],
+  );
+});
+
+const imageModelChoices = computed(() => {
+  if (availableModels.value.length) {
+    return uniqueModels(
+      availableModels.value,
+      settingsForm.value.image_to_image_models,
+    );
+  }
+  return uniqueModels(
+    settingsForm.value.image_to_image_models,
+    ["gpt-image-2"],
+  );
 });
 
 function imagesPath(offset = 0) {
@@ -63,6 +106,12 @@ async function load() {
       upstream_base_url: s.upstream_base_url || "",
       upstream_api_key: "",
       default_model: s.default_model || "gpt-image-2",
+      text_to_image_models: Array.isArray(s.text_to_image_models)
+        ? s.text_to_image_models
+        : ["gpt-image-2", "grok-imagine-image"],
+      image_to_image_models: Array.isArray(s.image_to_image_models)
+        ? s.image_to_image_models
+        : ["gpt-image-2"],
       response_format: s.response_format || "url",
       webdav_url: s.webdav_url || "",
       webdav_username: s.webdav_username || "",
@@ -92,6 +141,20 @@ async function load() {
 function selectTab(tab) {
   activeTab.value = tab;
   if (tab === "images" && !images.value.length) loadImages();
+}
+
+async function fetchUpstreamModels() {
+  loadingModels.value = true;
+  error.value = "";
+  try {
+    const data = await request("/api/admin/upstream-models", { token: auth.adminToken });
+    availableModels.value = Array.isArray(data.models) ? data.models : [];
+    settingsMsg.value = `已获取 ${availableModels.value.length} 个模型，请勾选后保存`;
+  } catch (e) {
+    error.value = e.message || String(e);
+  } finally {
+    loadingModels.value = false;
+  }
 }
 
 function openPreview(image) {
@@ -139,6 +202,13 @@ async function loadImages(append = false) {
 }
 
 async function saveSettings() {
+  if (
+    !settingsForm.value.text_to_image_models.length ||
+    !settingsForm.value.image_to_image_models.length
+  ) {
+    error.value = "文生图和图生图至少各选择一个模型";
+    return;
+  }
   savingSettings.value = true;
   error.value = "";
   settingsMsg.value = "";
@@ -146,6 +216,8 @@ async function saveSettings() {
     const body = {
       upstream_base_url: settingsForm.value.upstream_base_url.trim(),
       default_model: settingsForm.value.default_model.trim() || "gpt-image-2",
+      text_to_image_models: settingsForm.value.text_to_image_models,
+      image_to_image_models: settingsForm.value.image_to_image_models,
       response_format: settingsForm.value.response_format || "url",
       webdav_url: settingsForm.value.webdav_url.trim(),
       webdav_username: settingsForm.value.webdav_username.trim(),
@@ -173,6 +245,12 @@ async function saveSettings() {
     };
     settingsForm.value.upstream_base_url = s.upstream_base_url || "";
     settingsForm.value.default_model = s.default_model || "gpt-image-2";
+    settingsForm.value.text_to_image_models = Array.isArray(s.text_to_image_models)
+      ? s.text_to_image_models
+      : ["gpt-image-2", "grok-imagine-image"];
+    settingsForm.value.image_to_image_models = Array.isArray(s.image_to_image_models)
+      ? s.image_to_image_models
+      : ["gpt-image-2"];
     settingsForm.value.response_format = s.response_format || "url";
     settingsForm.value.webdav_url = s.webdav_url || "";
     settingsForm.value.webdav_username = s.webdav_username || "";
@@ -362,13 +440,8 @@ onMounted(load);
         <div class="field">
           <label>默认模型</label>
           <select v-model="settingsForm.default_model">
-            <option value="gpt-image-2">gpt-image-2</option>
-            <option value="grok-imagine-image">grok-imagine-image</option>
-            <option
-              v-if="!['gpt-image-2', 'grok-imagine-image'].includes(settingsForm.default_model)"
-              :value="settingsForm.default_model"
-            >
-              {{ settingsForm.default_model }}
+            <option v-for="modelName in textModelChoices" :key="modelName" :value="modelName">
+              {{ modelName }}
             </option>
           </select>
         </div>
@@ -380,6 +453,36 @@ onMounted(load);
           </select>
         </div>
       </div>
+
+      <h2 class="subsection-title">可用模型</h2>
+      <p class="muted tip">
+        先保存上游连接，再从 <span class="mono">/v1/models</span> 获取模型；勾选后保存到文生图和图生图配置。
+      </p>
+      <div class="model-config-head">
+        <button class="ghost" type="button" :disabled="loadingModels" @click="fetchUpstreamModels">
+          {{ loadingModels ? "获取中…" : "从上游获取模型" }}
+        </button>
+        <span v-if="availableModels.length" class="muted">
+          已获取 {{ availableModels.length }} 个模型
+        </span>
+      </div>
+      <div class="model-config-grid">
+        <div class="model-config-group">
+          <h3>文生图可用模型</h3>
+          <label v-for="modelName in textModelChoices" :key="`text-${modelName}`" class="model-option">
+            <input v-model="settingsForm.text_to_image_models" type="checkbox" :value="modelName" />
+            <span>{{ modelName }}</span>
+          </label>
+        </div>
+        <div class="model-config-group">
+          <h3>图生图可用模型</h3>
+          <label v-for="modelName in imageModelChoices" :key="`edit-${modelName}`" class="model-option">
+            <input v-model="settingsForm.image_to_image_models" type="checkbox" :value="modelName" />
+            <span>{{ modelName }}</span>
+          </label>
+        </div>
+      </div>
+
       <h2 class="subsection-title">WebDAV 存储</h2>
       <p class="muted tip">
         新图按日期保存；远端目录留空时使用 image-portal。公开访问基址留空时将使用 WebDAV 地址。
@@ -717,6 +820,46 @@ h2 {
   flex-wrap: wrap;
 }
 .settings-wide { grid-column: span 2; }
+.model-config-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.model-config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.model-config-group {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border-light);
+  border-radius: 0.75rem;
+  background: rgba(12, 18, 36, 0.35);
+}
+.model-config-group h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+.model-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  margin: 0;
+  color: var(--text);
+  cursor: pointer;
+  word-break: break-word;
+}
+.model-option input {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary-2);
+}
 .subsection-title {
   margin-top: 26px;
   padding-top: 20px;
@@ -879,7 +1022,8 @@ h2 {
 
 @media (max-width: 720px) {
   .form-grid,
-  .settings-grid {
+  .settings-grid,
+  .model-config-grid {
     grid-template-columns: 1fr;
   }
   .settings-wide { grid-column: auto; }

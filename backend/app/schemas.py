@@ -17,16 +17,6 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
-class GuestRegisterRequest(BaseModel):
-    device_id: str = Field(min_length=1, max_length=256)
-
-
-class GuestRegisterResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    is_new: bool  # 是否首次领取
-
-
 class MeResponse(BaseModel):
     id: int
     name: str
@@ -36,6 +26,8 @@ class MeResponse(BaseModel):
     quota_remaining: int
     enabled: bool
     default_model: str = ""
+    text_to_image_models: list[str] = Field(default_factory=list)
+    image_to_image_models: list[str] = Field(default_factory=list)
 
 
 # ---------- System settings (admin) ----------
@@ -45,6 +37,8 @@ class SystemSettingsOut(BaseModel):
     upstream_api_key_masked: str
     has_upstream_api_key: bool
     default_model: str
+    text_to_image_models: list[str]
+    image_to_image_models: list[str]
     response_format: str
     webdav_url: str
     webdav_username: str
@@ -60,6 +54,8 @@ class SystemSettingsUpdate(BaseModel):
     # 传空或不传 = 不修改现有 key
     upstream_api_key: str | None = None
     default_model: str | None = Field(default=None, max_length=128)
+    text_to_image_models: list[str] | None = None
+    image_to_image_models: list[str] | None = None
     response_format: str | None = Field(default=None, max_length=32)
     webdav_url: str | None = Field(default=None, max_length=512)
     webdav_username: str | None = Field(default=None, max_length=256)
@@ -67,6 +63,10 @@ class SystemSettingsUpdate(BaseModel):
     webdav_password: str | None = None
     webdav_path: str | None = Field(default=None, max_length=512)
     webdav_public_base_url: str | None = Field(default=None, max_length=512)
+
+
+class UpstreamModelsOut(BaseModel):
+    models: list[str]
 
 
 # ---------- Admin keys ----------

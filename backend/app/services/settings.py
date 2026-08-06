@@ -1,8 +1,41 @@
+import json
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.models import SystemSetting
+
+DEFAULT_TEXT_TO_IMAGE_MODELS = ["gpt-image-2", "grok-imagine-image"]
+DEFAULT_IMAGE_TO_IMAGE_MODELS = ["gpt-image-2"]
+
+
+def _clean_model_names(value, fallback: list[str]) -> list[str]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            value = []
+    if not isinstance(value, list):
+        value = []
+
+    result: list[str] = []
+    for item in value:
+        name = str(item).strip()
+        if name and name not in result:
+            result.append(name)
+    return result or list(fallback)
+
+
+def _dump_model_names(value, fallback: list[str]) -> str:
+    return json.dumps(_clean_model_names(value, fallback), ensure_ascii=False)
+
+
+def get_text_to_image_models(row: SystemSetting) -> list[str]:
+    return _clean_model_names(row.text_to_image_models, DEFAULT_TEXT_TO_IMAGE_MODELS)
+
+
+def get_image_to_image_models(row: SystemSetting) -> list[str]:
+    return _clean_model_names(row.image_to_image_models, DEFAULT_IMAGE_TO_IMAGE_MODELS)
 
 
 def get_or_create_settings(db: Session) -> SystemSetting:
@@ -13,6 +46,8 @@ def get_or_create_settings(db: Session) -> SystemSetting:
             upstream_base_url="",
             upstream_api_key="",
             default_model="gpt-image-2",
+            text_to_image_models=json.dumps(DEFAULT_TEXT_TO_IMAGE_MODELS),
+            image_to_image_models=json.dumps(DEFAULT_IMAGE_TO_IMAGE_MODELS),
             response_format="url",
             webdav_url="",
             webdav_username="",
@@ -41,6 +76,8 @@ def apply_settings_update(
     upstream_base_url: str | None = None,
     upstream_api_key: str | None = None,
     default_model: str | None = None,
+    text_to_image_models: list[str] | None = None,
+    image_to_image_models: list[str] | None = None,
     response_format: str | None = None,
     webdav_url: str | None = None,
     webdav_username: str | None = None,
@@ -56,6 +93,14 @@ def apply_settings_update(
         row.upstream_api_key = upstream_api_key.strip()
     if default_model is not None:
         row.default_model = default_model.strip() or "gpt-image-2"
+    if text_to_image_models is not None:
+        row.text_to_image_models = _dump_model_names(
+            text_to_image_models, DEFAULT_TEXT_TO_IMAGE_MODELS
+        )
+    if image_to_image_models is not None:
+        row.image_to_image_models = _dump_model_names(
+            image_to_image_models, DEFAULT_IMAGE_TO_IMAGE_MODELS
+        )
     if response_format is not None:
         row.response_format = response_format.strip() or "url"
     if webdav_url is not None:
