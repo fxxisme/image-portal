@@ -23,6 +23,7 @@ const galleryOpen = ref(false);
 const generationMode = ref("text-to-image");
 const textModel = ref("gpt-image-2");
 const textToImageModels = ["gpt-image-2", "grok-imagine-image"];
+let messageLoadSeq = 0;
 
 const isEditMode = computed(() => generationMode.value === "image-to-image");
 const selectedModel = computed({
@@ -82,24 +83,27 @@ async function loadConversations() {
   }
 }
 
-async function loadMessages() {
-  if (!currentId.value) {
+async function loadMessages(conversationId = currentId.value) {
+  const loadSeq = ++messageLoadSeq;
+  if (!conversationId) {
     messages.value = [];
     return;
   }
   loadingChat.value = true;
   error.value = "";
   try {
-    const detail = await request(`/api/conversations/${currentId.value}`, {
+    const detail = await request(`/api/conversations/${conversationId}`, {
       token: auth.userToken,
     });
+    if (loadSeq !== messageLoadSeq || conversationId !== currentId.value) return;
     messages.value = detail.messages || [];
     await nextTick();
     scrollBottom();
   } catch (e) {
+    if (loadSeq !== messageLoadSeq || conversationId !== currentId.value) return;
     error.value = e.message || String(e);
   } finally {
-    loadingChat.value = false;
+    if (loadSeq === messageLoadSeq) loadingChat.value = false;
   }
 }
 
@@ -302,8 +306,6 @@ onMounted(async () => {
   await loadConversations();
   if (!conversations.value.length) {
     await createConversation();
-  } else {
-    await loadMessages();
   }
 });
 </script>

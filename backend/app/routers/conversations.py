@@ -56,7 +56,11 @@ def get_conversation(
     message_ids = [message.id for message in item.messages]
     image_rows = (
         db.query(GeneratedImage)
-        .filter(GeneratedImage.message_id.in_(message_ids))
+        .filter(
+            GeneratedImage.api_key_id == api_key.id,
+            GeneratedImage.conversation_id == item.id,
+            GeneratedImage.message_id.in_(message_ids),
+        )
         .order_by(GeneratedImage.id.asc())
         .all()
         if message_ids
