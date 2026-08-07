@@ -4,6 +4,12 @@ import { useRouter } from "vue-router";
 import { request } from "../api/http";
 import LoginModal from "../components/LoginModal.vue";
 import { useAuthStore } from "../stores/auth";
+import { formatChinaDateTime } from "../utils/datetime";
+import {
+  createLocalConversation,
+  loadLocalConversations,
+  saveLocalConversations,
+} from "../utils/local-conversations";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -32,7 +38,6 @@ const conversations = ref([]);
 const currentId = ref(null);
 const messages = ref([]);
 const prompt = ref("");
-const loadingChat = ref(false);
 const sending = ref(false);
 const error = ref("");
 const editImageUrls = ref([]);
@@ -45,7 +50,6 @@ const textModel = ref(typeof savedPreferences.textModel === "string" ? savedPref
 const editModel = ref(typeof savedPreferences.editModel === "string" ? savedPreferences.editModel : "");
 const fallbackTextToImageModels = ["gpt-image-2", "grok-imagine-image"];
 const fallbackImageToImageModels = ["gpt-image-2"];
-let messageLoadSeq = 0;
 
 const isEditMode = computed(() => generationMode.value === "image-to-image");
 const textToImageModels = computed(() => {
@@ -117,81 +121,85 @@ async function ensureMe() {
   }
 }
 
-async function loadConversations() {
+function saveBrowserConversations() {
   try {
-    conversations.value = await request("/api/conversations", { token: auth.userToken });
-    if (!currentId.value && conversations.value.length) {
-      currentId.value = conversations.value[0].id;
-    }
-  } catch (e) {
-    error.value = e.message || String(e);
-    if (e.status === 401) {
-      auth.logoutUser();
-      router.push({ name: "login" });
-    }
+    saveLocalConversations(conversations.value);
+  } catch {
+    error.value = "本地对话保存失败，请清理浏览器存储空间后重试";
   }
 }
 
-async function loadMessages(conversationId = currentId.value) {
-  const loadSeq = ++messageLoadSeq;
-  if (!conversationId) {
-    messages.value = [];
-    return;
-  }
-  loadingChat.value = true;
+function findLocalConversation(id = currentId.value) {
+  return conversations.value.find((conversation) => conversation.id === id) || null;
+}
+
+function persistConversation(id, messageList, { touch = true } = {}) {
+  const conversation = findLocalConversation(id);
+  if (!conversation) return;
+  conversation.messages = messageList;
+  if (touch) conversation.updated_at = new Date().toISOString();
+  conversations.value = [...conversations.value].sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+  );
+  saveBrowserConversations();
+}
+
+function restoreBrowserConversations() {
+  conversations.value = loadLocalConversations().sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+  );
+  const first = conversations.value[0];
+  currentId.value = first?.id || null;
+  messages.value = first?.messages || [];
+}
+
+async function ensureBackendConversation(localConversationId) {
+  const conversation = findLocalConversation(localConversationId);
+  const apiKeyId = auth.me?.id;
+  if (!conversation || !apiKeyId) throw new Error("当前登录状态无效，请重新登录");
+
+  const key = String(apiKeyId);
+  const existingId = conversation.backend_conversation_ids[key];
+  if (Number.isInteger(existingId)) return existingId;
+
+  const item = await request("/api/conversations", {
+    method: "POST",
+    token: auth.userToken,
+    body: { title: conversation.title || "新对话" },
+  });
+  conversation.backend_conversation_ids[key] = item.id;
+  persistConversation(localConversationId, conversation.messages, { touch: false });
+  return item.id;
+}
+
+function createConversation() {
   error.value = "";
-  try {
-    const detail = await request(`/api/conversations/${conversationId}`, {
-      token: auth.userToken,
-    });
-    if (loadSeq !== messageLoadSeq || conversationId !== currentId.value) return;
-    messages.value = detail.messages || [];
-    await nextTick();
-    scrollBottom();
-  } catch (e) {
-    if (loadSeq !== messageLoadSeq || conversationId !== currentId.value) return;
-    error.value = e.message || String(e);
-  } finally {
-    if (loadSeq === messageLoadSeq) loadingChat.value = false;
-  }
+  const item = createLocalConversation();
+  conversations.value.unshift(item);
+  currentId.value = item.id;
+  messages.value = item.messages;
+  saveBrowserConversations();
+  clearEditImage();
 }
 
-async function createConversation() {
-  error.value = "";
-  try {
-    const item = await request("/api/conversations", {
-      method: "POST",
-      token: auth.userToken,
-      body: { title: "新对话" },
-    });
-    conversations.value.unshift(item);
-    currentId.value = item.id;
-    messages.value = [];
-    clearEditImage();
-  } catch (e) {
-    error.value = e.message || String(e);
+function removeConversation(id) {
+  if (!window.confirm("删除本地对话及历史？后台生成记录会保留。")) return;
+  conversations.value = conversations.value.filter((conversation) => conversation.id !== id);
+  if (currentId.value === id) {
+    const next = conversations.value[0];
+    currentId.value = next?.id || null;
+    messages.value = next?.messages || [];
   }
-}
-
-async function removeConversation(id) {
-  if (!window.confirm("删除该对话及历史？")) return;
-  try {
-    await request(`/api/conversations/${id}`, {
-      method: "DELETE",
-      token: auth.userToken,
-    });
-    conversations.value = conversations.value.filter((c) => c.id !== id);
-    if (currentId.value === id) {
-      currentId.value = conversations.value[0]?.id || null;
-    }
-  } catch (e) {
-    error.value = e.message || String(e);
-  }
+  saveBrowserConversations();
 }
 
 function selectConversation(id) {
-  currentId.value = id;
+  const conversation = findLocalConversation(id);
+  if (!conversation) return;
+  currentId.value = conversation.id;
+  messages.value = conversation.messages;
   clearEditImage();
+  nextTick(scrollBottom);
 }
 
 function clearEditImage({ resetMode = true } = {}) {
@@ -275,35 +283,47 @@ async function send() {
     return;
   }
   if (!currentId.value) {
-    await createConversation();
+    createConversation();
   }
   if (!currentId.value) return;
 
+  const localConversationId = currentId.value;
+  const conversation = findLocalConversation(localConversationId);
+  if (!conversation) return;
+
   sending.value = true;
   error.value = "";
-
-  const optimisticUserMsg = {
-    id: "pending-" + Date.now(),
-    role: "user",
-    content: text,
-    ref_image_url: editImageUrls.value[0] || undefined,
-  };
-  messages.value.push(optimisticUserMsg);
-  prompt.value = "";
-  const refImages = [...editImageUrls.value];
-  const requestModel = selectedModel.value || undefined;
-  clearEditImage();
-  await nextTick();
-  scrollBottom();
-
-  const bodyBase = {
-    conversation_id: currentId.value,
-    prompt: text,
-    n: 1,
-    model: requestModel,
-  };
+  let localMessages = null;
 
   try {
+    if (conversation.title === "新对话") {
+      conversation.title = text.slice(0, 40);
+      persistConversation(localConversationId, conversation.messages);
+    }
+    const backendConversationId = await ensureBackendConversation(localConversationId);
+    const apiKeyId = String(auth.me?.id || "unknown");
+    const optimisticUserMsg = {
+      id: "pending-" + Date.now(),
+      role: "user",
+      content: text,
+      ref_image_url: editImageUrls.value[0] || undefined,
+    };
+    localMessages = conversation.messages;
+    localMessages.push(optimisticUserMsg);
+    persistConversation(localConversationId, localMessages);
+    prompt.value = "";
+    const refImages = [...editImageUrls.value];
+    const requestModel = selectedModel.value || undefined;
+    clearEditImage();
+    await nextTick();
+    if (currentId.value === localConversationId) scrollBottom();
+
+    const bodyBase = {
+      conversation_id: backendConversationId,
+      prompt: text,
+      n: 1,
+      model: requestModel,
+    };
     let data;
     if (refImages.length) {
       data = await request("/api/edit", {
@@ -319,26 +339,35 @@ async function send() {
       });
     }
 
-    const idx = messages.value.findIndex((m) => m.id === optimisticUserMsg.id);
+    const idx = localMessages.findIndex((m) => m.id === optimisticUserMsg.id);
     if (idx !== -1) {
-      messages.value.splice(idx, 1, data.user_message);
+      localMessages.splice(idx, 1, {
+        ...data.user_message,
+        id: `${apiKeyId}-${data.user_message.id}`,
+      });
     } else {
-      messages.value.push(data.user_message);
+      localMessages.push({ ...data.user_message, id: `${apiKeyId}-${data.user_message.id}` });
     }
-    messages.value.push(data.assistant_message);
+    localMessages.push({
+      ...data.assistant_message,
+      id: `${apiKeyId}-${data.assistant_message.id}`,
+    });
+    persistConversation(localConversationId, localMessages);
     auth.setQuotaRemaining(data.quota_remaining);
     if (auth.me) auth.me.quota_used = (auth.me.quota_total || 0) - data.quota_remaining;
-    await loadConversations();
     await nextTick();
-    scrollBottom();
+    if (currentId.value === localConversationId) scrollBottom();
   } catch (e) {
     const detail = e.message || String(e);
-    messages.value.push({
-      id: "error-" + Date.now(),
-      role: "assistant",
-      content: "❌ 生成失败\n\n" + detail,
-      cost: 0,
-    });
+    if (localMessages) {
+      localMessages.push({
+        id: "error-" + Date.now(),
+        role: "assistant",
+        content: "❌ 生成失败\n\n" + detail,
+        cost: 0,
+      });
+      persistConversation(localConversationId, localMessages);
+    }
     error.value = e.message || String(e);
   } finally {
     sending.value = false;
@@ -350,16 +379,14 @@ function logout() {
   router.push({ name: "login" });
 }
 
-watch(currentId, () => {
-  loadMessages();
-});
-
 onMounted(async () => {
   await ensureMe();
-  await loadConversations();
+  restoreBrowserConversations();
   if (!conversations.value.length) {
-    await createConversation();
+    createConversation();
   }
+  await nextTick();
+  scrollBottom();
 });
 
 const showLoginModal = ref(false);
@@ -368,11 +395,8 @@ const handleLoginSuccess = async () => {
   showLoginModal.value = false;
   error.value = "";
   syncModelSelections();
-  currentId.value = null;
-  messages.value = [];
-  conversations.value = [];
-  await loadConversations();
-  if (!conversations.value.length) await createConversation();
+  if (!conversations.value.length) createConversation();
+  else selectConversation(currentId.value || conversations.value[0].id);
 };
 </script>
 
@@ -404,7 +428,7 @@ const handleLoginSuccess = async () => {
           @click="selectConversation(c.id)"
         >
           <div class="conv-title">{{ c.title || "未命名" }}</div>
-          <div class="conv-meta muted">{{ new Date(c.updated_at).toLocaleString() }}</div>
+          <div class="conv-meta muted">{{ formatChinaDateTime(c.updated_at) }}</div>
           <span class="del" title="删除" @click.stop="removeConversation(c.id)">&times;</span>
         </button>
         <div v-if="!conversations.length" class="muted empty">暂无对话</div>
@@ -447,8 +471,7 @@ const handleLoginSuccess = async () => {
 
       <!-- messages -->
       <div ref="scroller" class="messages">
-        <div v-if="loadingChat" class="center muted">加载中…</div>
-        <div v-else-if="!messages.length" class="center tip">
+        <div v-if="!messages.length" class="center tip">
           输入描述即可生图；上传图片后可改图。成功出图会扣额度。
         </div>
 

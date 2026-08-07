@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { apiUrl, request } from "../api/http";
 import { useAuthStore } from "../stores/auth";
+import { formatChinaDateTime } from "../utils/datetime";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -520,7 +521,7 @@ onMounted(load);
         </button>
         <span v-if="settingsMsg" class="ok">{{ settingsMsg }}</span>
         <span v-if="settingsMeta.updated_at" class="muted mono">
-          更新于 {{ new Date(settingsMeta.updated_at).toLocaleString() }}
+          更新于 {{ formatChinaDateTime(settingsMeta.updated_at) }}
         </span>
       </div>
     </section>
@@ -551,7 +552,7 @@ onMounted(load);
             <span>{{ image.action === 'edit' ? '改图' : '生成' }}</span>
           </div>
           <div class="image-prompt">{{ image.prompt || '无提示词' }}</div>
-          <time>{{ new Date(image.created_at).toLocaleString() }}</time>
+          <time>{{ formatChinaDateTime(image.created_at) }}</time>
         </button>
       </div>
       <div v-else class="muted gallery-empty">{{ loadingImages ? "图片加载中…" : "暂无生成图片" }}</div>
@@ -676,7 +677,7 @@ onMounted(load);
           </thead>
           <tbody>
             <tr v-for="u in usage" :key="u.id">
-              <td class="mono">{{ new Date(u.created_at).toLocaleString() }}</td>
+              <td class="mono">{{ formatChinaDateTime(u.created_at) }}</td>
               <td>#{{ u.api_key_id }}</td>
               <td>{{ u.action }}</td>
               <td>{{ u.cost }}</td>
