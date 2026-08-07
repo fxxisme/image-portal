@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------- Auth ----------
@@ -73,6 +73,17 @@ class UpstreamModelsOut(BaseModel):
 class ApiKeyCreate(BaseModel):
     name: str = Field(default="", max_length=128)
     quota_total: int = Field(default=10, ge=0)
+    # 留空时由服务端生成随机密钥。
+    api_key: str | None = Field(default=None, min_length=8, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+
+    @field_validator("api_key", mode="before")
+    @classmethod
+    def normalize_api_key(cls, value: object) -> object:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return value
+        return value.strip() or None
 
 
 class ApiKeyUpdate(BaseModel):

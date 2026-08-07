@@ -17,11 +17,16 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore();
+  const apiKey = typeof to.query.apikey === "string" ? to.query.apikey.trim() : "";
+
   if (to.meta.requiresAdmin && !auth.isAdminLoggedIn) return { name: "admin-login" };
   if (to.name === "admin-login" && auth.isAdminLoggedIn) return { name: "admin" };
-  if (to.name === "login" && auth.isUserLoggedIn) return { name: "chat" };
+  if (apiKey && to.name !== "login") {
+    return { name: "login", query: { apikey: apiKey }, replace: true };
+  }
+  if (to.name === "login" && auth.isUserLoggedIn && !apiKey) return { name: "chat" };
 
-  if (to.meta.requiresUser && !auth.isUserLoggedIn) return { name: "login" };
+  if (to.meta.requiresUser && !auth.isUserLoggedIn) return { name: "login", query: to.query };
 
   return true;
 });

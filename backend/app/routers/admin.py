@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.auth import create_token, hash_api_key, require_admin
+from app.auth import create_token, find_api_key_by_raw, hash_api_key, require_admin
 from app.config import get_settings
 from app.database import get_db
 from app.models import ApiKey, GeneratedImage, UsageLog
@@ -124,7 +124,9 @@ def create_key(
     _: dict = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> ApiKeyCreated:
-    raw = "sk-" + secrets.token_urlsafe(32)
+    raw = body.api_key or "sk-" + secrets.token_urlsafe(32)
+    if body.api_key and find_api_key_by_raw(db, raw, enabled_only=False):
+        raise HTTPException(status_code=409, detail="自定义秘钥已存在")
     item = ApiKey(
         key_hash=hash_api_key(raw),
         key_prefix=raw[:10],

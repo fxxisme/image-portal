@@ -78,9 +78,12 @@ def require_admin(token: str = Depends(get_bearer)) -> dict[str, Any]:
     return payload
 
 
-def find_api_key_by_raw(db: Session, raw: str) -> ApiKey | None:
-    """登录时遍历校验 hash（秘钥数量通常不大）。"""
-    for item in db.query(ApiKey).filter(ApiKey.enabled.is_(True)).all():
+def find_api_key_by_raw(db: Session, raw: str, *, enabled_only: bool = True) -> ApiKey | None:
+    """遍历校验 hash；创建自定义密钥时也需检查已禁用记录。"""
+    query = db.query(ApiKey)
+    if enabled_only:
+        query = query.filter(ApiKey.enabled.is_(True))
+    for item in query.all():
         if verify_api_key(raw, item.key_hash):
             return item
     return None

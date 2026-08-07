@@ -1,26 +1,39 @@
 <script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
 const apiKey = ref("");
 const loading = ref(false);
 const error = ref("");
 
-async function onSubmit() {
+async function login({ replace = false } = {}) {
   error.value = "";
   loading.value = true;
   try {
     await auth.loginUser(apiKey.value.trim());
-    router.push({ name: "chat" });
+    await router[replace ? "replace" : "push"]({ name: "chat" });
   } catch (e) {
     error.value = e.message || String(e);
   } finally {
     loading.value = false;
   }
 }
+
+async function onSubmit() {
+  await login();
+}
+
+onMounted(async () => {
+  const queryApiKey = typeof route.query.apikey === "string" ? route.query.apikey.trim() : "";
+  if (!queryApiKey) return;
+
+  apiKey.value = queryApiKey;
+  await login({ replace: true });
+});
 </script>
 
 <template>
@@ -66,9 +79,6 @@ async function onSubmit() {
         </button>
       </form>
 
-      <p class="foot">
-        <router-link to="/admin/login">管理后台</router-link>
-      </p>
     </div>
   </div>
 </template>

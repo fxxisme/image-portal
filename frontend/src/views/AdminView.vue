@@ -25,7 +25,7 @@ const activeTab = ref("settings");
 const previewImage = ref(null);
 const downloadingImage = ref(false);
 
-const form = ref({ name: "", quota_total: 20 });
+const form = ref({ name: "", quota_total: 20, api_key: "" });
 const settingsForm = ref({
   upstream_base_url: "",
   upstream_api_key: "",
@@ -275,10 +275,11 @@ async function createKey() {
       body: {
         name: form.value.name || "未命名",
         quota_total: Number(form.value.quota_total) || 0,
+        api_key: form.value.api_key.trim() || undefined,
       },
     });
     createdKey.value = item.api_key;
-    form.value = { name: "", quota_total: 20 };
+    form.value = { name: "", quota_total: 20, api_key: "" };
     await load();
   } catch (e) {
     error.value = e.message || String(e);
@@ -589,6 +590,17 @@ onMounted(load);
           <label>额度（张）</label>
           <input v-model.number="form.quota_total" type="number" min="0" />
         </div>
+        <div class="field" style="margin:0">
+          <label>自定义秘钥（可选）</label>
+          <input
+            v-model="form.api_key"
+            type="text"
+            maxlength="128"
+            placeholder="留空自动生成；8-128 位字母、数字、_、-"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
         <div class="actions">
           <button class="primary" type="button" @click="createKey">创建</button>
         </div>
@@ -868,7 +880,7 @@ h2 {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr auto;
+  grid-template-columns: 2fr 1fr 2fr auto;
   gap: 14px;
   align-items: end;
 }
