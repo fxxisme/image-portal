@@ -57,6 +57,10 @@ def get_current_api_key(
     token: str = Depends(get_bearer),
     db: Session = Depends(get_db),
 ) -> ApiKey:
+    return get_current_api_key_for_token(token, db)
+
+
+def get_current_api_key_for_token(token: str, db: Session) -> ApiKey:
     payload = decode_token(token)
     if payload.get("role") != "user":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="需要用户令牌")

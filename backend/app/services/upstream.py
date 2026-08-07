@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from sqlalchemy.orm import Session
@@ -319,6 +320,16 @@ async def videos_retrieve(db: Session, *, request_id: str) -> dict[str, Any]:
     return _parse_video_response(
         await _get_json(endpoint, headers={"Authorization": f"Bearer {cfg.api_key}"})
     )
+
+
+def video_content_request(db: Session, *, request_id: str) -> tuple[str, dict[str, str]]:
+    cfg = load_video_upstream_config(db)
+    _require_video_config(cfg)
+    endpoint = f"{normalize_base(cfg.base_url)}/v1/videos/{quote(request_id, safe='')}/content"
+    return endpoint, {
+        "Authorization": f"Bearer {cfg.api_key}",
+        "Accept-Encoding": "identity",
+    }
 
 
 def _extract_urls(res: httpx.Response) -> list[str]:

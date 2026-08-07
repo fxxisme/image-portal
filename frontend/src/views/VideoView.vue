@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { request } from "../api/http";
+import { apiUrl, request } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();
@@ -41,6 +41,12 @@ function resetResult() {
   progress.value = null;
   status.value = "";
   video.value = null;
+}
+
+function videoContentUrl(id, download = false) {
+  const params = new URLSearchParams({ access_token: auth.userToken });
+  if (download) params.set("download", "true");
+  return apiUrl(`/api/videos/${encodeURIComponent(id)}/content?${params.toString()}`);
 }
 
 function readImage(file) {
@@ -95,7 +101,11 @@ async function pollStatus() {
     status.value = data.status || "";
     progress.value = data.progress;
     if (data.status === "done" && Number(data.progress) === 100 && data.video?.url) {
-      video.value = data.video;
+      video.value = {
+        ...data.video,
+        url: videoContentUrl(pollingRequestId),
+        downloadUrl: videoContentUrl(pollingRequestId, true),
+      };
       stopPolling();
       return;
     }
@@ -166,23 +176,23 @@ onBeforeUnmount(stopPolling);
         <h1>视频生成</h1>
         <p class="muted">任务和视频仅在当前页面使用，不保存到历史记录。</p>
       </div>
-      <button class="ghost" type="button" @click="router.push({ name: 'chat' })">图片生成</button>
+      <button class="ghost" type="button" :disabled="polling" @click="router.push({ name: 'chat' })">图片生成</button>
     </header>
 
     <section class="video-workspace">
       <div class="video-form">
         <div class="field">
           <label for="video-prompt">视频描述</label>
-          <textarea id="video-prompt" v-model="prompt" placeholder="描述画面、运动和镜头语言" rows="6" />
+          <textarea id="video-prompt" v-model="prompt" :disabled="polling" placeholder="描述画面、运动和镜头语言" rows="6" />
         </div>
         <div class="video-options">
           <div class="field">
             <label>时长（秒）</label>
-            <input v-model.number="duration" type="number" min="1" max="120" />
+            <input v-model.number="duration" :disabled="polling" type="number" min="1" max="120" />
           </div>
           <div class="field">
             <label>画面比例</label>
-            <select v-model="aspectRatio">
+            <select v-model="aspectRatio" :disabled="polling">
               <option value="16:9">16:9</option>
               <option value="9:16">9:16</option>
               <option value="1:1">1:1</option>
@@ -190,7 +200,7 @@ onBeforeUnmount(stopPolling);
           </div>
           <div class="field">
             <label>分辨率</label>
-            <select v-model="resolution">
+            <select v-model="resolution" :disabled="polling">
               <option value="420p">420p</option>
               <option value="720p">720p</option>
             </select>
@@ -199,11 +209,11 @@ onBeforeUnmount(stopPolling);
         <div class="upload-row">
           <label class="upload-control">
             <span>首帧图片（可选）</span>
-            <input type="file" accept="image/*" @change="selectFirstFrame" />
+            <input :disabled="polling" type="file" accept="image/*" @change="selectFirstFrame" />
           </label>
           <label class="upload-control">
             <span>参考图片（可选，最多 4 张）</span>
-            <input type="file" accept="image/*" multiple @change="selectReferences" />
+            <input :disabled="polling" type="file" accept="image/*" multiple @change="selectReferences" />
           </label>
         </div>
         <div v-if="firstFrame || referenceImages.length" class="image-previews">
@@ -215,7 +225,7 @@ onBeforeUnmount(stopPolling);
           <button class="primary" type="button" :disabled="!canSubmit" @click="generate">
             {{ submitting ? "提交中…" : polling ? progressLabel : "生成视频" }}
           </button>
-          <button v-if="polling || video || error" class="ghost" type="button" @click="resetResult">清除结果</button>
+          <button v-if="video || error" class="ghost" type="button" @click="resetResult">清除结果</button>
         </div>
       </div>
 
@@ -226,7 +236,10 @@ onBeforeUnmount(stopPolling);
           <span v-if="requestId" class="mono">任务 {{ requestId }}</span>
           <span v-else class="muted">提交任务后将在此显示视频</span>
         </div>
-        <a v-if="video?.url" class="ghost download-link" :href="video.url" target="_blank" rel="noopener">打开视频</a>
+        <div v-if="video?.url" class="video-tools">
+          <a class="primary download-link" :href="video.downloadUrl" :download="`video-${requestId}.mp4`">下载视频</a>
+          <a class="ghost download-link" :href="video.url" target="_blank" rel="noopener">打开视频</a>
+        </div>
       </div>
     </section>
   </main>
@@ -250,6 +263,8 @@ onBeforeUnmount(stopPolling);
 .video-result { min-height: 360px; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
 .video-result video { width: 100%; max-height: 480px; background: #000; border-radius: 4px; }
 .video-placeholder { min-height: 250px; display: grid; place-content: center; gap: 10px; text-align: center; border: 1px dashed var(--border-light); color: var(--text); }
-.download-link { align-self: flex-start; }
+.video-tools { display: flex; gap: 10px; align-items: center; }
+.download-link { display: inline-flex; align-items: center; text-decoration: none; }
+.download-link.primary { background: var(--prismatic); color: #23005c; border-radius: 0.75rem; padding: 10px 16px; font-family: var(--font-mono); font-size: 14px; }
 @media (max-width: 760px) { .video-page { padding: 18px; } .video-workspace { grid-template-columns: 1fr; } .video-options, .upload-row { grid-template-columns: 1fr; } .video-header { align-items: stretch; flex-direction: column; } }
 </style>

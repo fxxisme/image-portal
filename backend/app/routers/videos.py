@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_api_key
+from app.auth import get_current_api_key, get_current_api_key_for_token
+from app.config import get_settings
 from app.database import get_db
 from app.models import ApiKey
 from app.schemas import (
@@ -9,9 +12,15 @@ from app.schemas import (
     VideoGenerationResponse,
     VideoStatusResponse,
 )
-from app.services.upstream import UpstreamError, videos_generations, videos_retrieve
+from app.services.upstream import (
+    UpstreamError,
+    video_content_request,
+    videos_generations,
+    videos_retrieve,
+)
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
+settings = get_settings()
 
 
 @router.post("/generations", response_model=VideoGenerationResponse)
@@ -42,4 +51,63 @@ async def get_video_status(
         model=data.get("model"),
         progress=data.get("progress"),
         video=data.get("video") if isinstance(data.get("video"), dict) else None,
+    )
+
+
+@router.get("/{request_id}/content")
+async def get_video_content(
+    request_id: str,
+    request: Request,
+    access_token: str = Query(min_length=1),
+    download: bool = False,
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    # <video> 和下载链接无法携带 Authorization，因此使用当前用户会话令牌鉴权。
+    get_current_api_key_for_token(access_token, db)
+    try:
+        endpoint, headers = video_content_request(db, request_id=request_id)
+    except UpstreamError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    range_header = request.headers.get("range")
+    if range_header:
+        headers["Range"] = range_header
+
+    client = httpx.AsyncClient(timeout=settings.upstream_timeout_seconds)
+    try:
+        upstream = await client.send(client.build_request("GET", endpoint, headers=headers), stream=True)
+    except httpx.TimeoutException as exc:
+        await client.aclose()
+        raise HTTPException(status_code=504, detail="视频内容请求超时") from exc
+    except httpx.HTTPError as exc:
+        await client.aclose()
+        raise HTTPException(status_code=502, detail=f"视频内容请求失败: {exc}") from exc
+
+    if upstream.status_code >= 400:
+        body = (await upstream.aread()).decode("utf-8", errors="replace")
+        await upstream.aclose()
+        await client.aclose()
+        raise HTTPException(status_code=502, detail=f"视频上游返回 HTTP {upstream.status_code}: {body[:500]}")
+
+    response_headers = {
+        name: upstream.headers[name]
+        for name in ("content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified")
+        if name in upstream.headers
+    }
+    if download:
+        response_headers["content-disposition"] = 'attachment; filename="video.mp4"'
+
+    async def stream_content():
+        try:
+            async for chunk in upstream.aiter_bytes():
+                yield chunk
+        finally:
+            await upstream.aclose()
+            await client.aclose()
+
+    return StreamingResponse(
+        stream_content(),
+        status_code=upstream.status_code,
+        headers=response_headers,
+        media_type=None,
     )
