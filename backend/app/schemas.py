@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -197,7 +198,7 @@ class VideoGenerationRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=10000)
     duration: int = Field(default=8, ge=1, le=120)
     aspect_ratio: str = Field(default="16:9", min_length=3, max_length=16)
-    resolution: str = Field(default="720p", min_length=2, max_length=32)
+    resolution: Literal["420p", "720p"] = "720p"
     image: str | None = Field(default=None, max_length=16_000_000)
     reference_images: list[str] | None = Field(default=None, max_length=4)
 

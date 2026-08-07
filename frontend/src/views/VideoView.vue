@@ -191,8 +191,8 @@ onBeforeUnmount(stopPolling);
           <div class="field">
             <label>分辨率</label>
             <select v-model="resolution">
+              <option value="420p">420p</option>
               <option value="720p">720p</option>
-              <option value="1080p">1080p</option>
             </select>
           </div>
         </div>
