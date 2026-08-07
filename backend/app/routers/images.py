@@ -222,24 +222,27 @@ async def edit(
     model = (body.model or available_models[0]).strip()
     if model not in available_models:
         raise HTTPException(status_code=400, detail="所选图生图模型不可用")
+    image_urls = [image.url for image in body.images]
     user_msg = Message(
         conversation_id=conv.id,
         role="user",
         content=body.prompt,
         action="edit",
-        ref_image_url=body.image_url,
+        ref_image_url=image_urls[0],
         cost=0,
         model=model,
     )
     db.add(user_msg)
     db.flush()
 
-    resolved_image_url = _resolve_edit_image(db, api_key, body.image_url)
+    resolved_image_urls = [
+        _resolve_edit_image(db, api_key, image_url) for image_url in image_urls
+    ]
     try:
         urls = await images_edits(
             db,
             prompt=body.prompt,
-            image_url=resolved_image_url,
+            image_urls=resolved_image_urls,
             model=model,
             n=body.n,
         )
@@ -266,7 +269,7 @@ async def edit(
         role="assistant",
         content=f"已编辑生成 {len(urls)} 张图片",
         action="edit",
-        ref_image_url=body.image_url,
+        ref_image_url=image_urls[0],
         image_urls=dump_urls(urls),
         cost=cost,
         model=model,

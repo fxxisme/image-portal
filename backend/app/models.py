@@ -139,18 +139,3 @@ class GeneratedImage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     api_key: Mapped["ApiKey"] = relationship(back_populates="generated_images")
-
-
-class GuestTrial(Base):
-    """游客免费试用记录：指纹 → ApiKey 映射，防重复领取。"""
-
-    __tablename__ = "guest_trials"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    fingerprint_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
-    api_key_id: Mapped[int] = mapped_column(ForeignKey("api_keys.id", ondelete="CASCADE"), index=True)
-    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-    api_key: Mapped["ApiKey"] = relationship()

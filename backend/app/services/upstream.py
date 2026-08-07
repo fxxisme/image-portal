@@ -186,7 +186,7 @@ async def images_edits(
     db: Session,
     *,
     prompt: str,
-    image_url: str,
+    image_urls: list[str],
     model: str | None = None,
     n: int = 1,
     response_format: str | None = None,
@@ -202,11 +202,9 @@ async def images_edits(
     body: dict[str, Any] = {
         "model": use_model,
         "prompt": prompt,
+        "images": [{"url": image_url} for image_url in image_urls],
         "n": n,
         "response_format": fmt,
-        "image_url": image_url,
-        "image": image_url,
-        "images": [{"image_url": image_url}],
     }
 
     headers = {

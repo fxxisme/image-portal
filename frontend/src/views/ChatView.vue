@@ -7,6 +7,26 @@ import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();
 const router = useRouter();
+const PREFERENCES_KEY = "image-portal:generation-preferences";
+
+function loadGenerationPreferences() {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(PREFERENCES_KEY) || "{}");
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveGenerationPreferences(preferences) {
+  try {
+    window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
+  } catch {
+    // 本地存储不可用时仍保持当前会话内的选择。
+  }
+}
+
+const savedPreferences = loadGenerationPreferences();
 
 const conversations = ref([]);
 const currentId = ref(null);
@@ -15,13 +35,14 @@ const prompt = ref("");
 const loadingChat = ref(false);
 const sending = ref(false);
 const error = ref("");
-const editImageSrc = ref("");
-const editPreview = ref("");
+const editImageUrls = ref([]);
 const fileInput = ref(null);
 const scroller = ref(null);
-const generationMode = ref("text-to-image");
-const textModel = ref("");
-const editModel = ref("");
+const generationMode = ref(
+  savedPreferences.mode === "image-to-image" ? "image-to-image" : "text-to-image",
+);
+const textModel = ref(typeof savedPreferences.textModel === "string" ? savedPreferences.textModel : "");
+const editModel = ref(typeof savedPreferences.editModel === "string" ? savedPreferences.editModel : "");
 const fallbackTextToImageModels = ["gpt-image-2", "grok-imagine-image"];
 const fallbackImageToImageModels = ["gpt-image-2"];
 let messageLoadSeq = 0;
@@ -51,7 +72,7 @@ const canSend = computed(
   () =>
     !!prompt.value.trim() &&
     !sending.value &&
-    (!isEditMode.value || !!editImageSrc.value),
+    (!isEditMode.value || editImageUrls.value.length > 0),
 );
 
 const quotaText = computed(() => {
@@ -75,6 +96,14 @@ function syncModelSelections() {
     editModel.value = imageToImageModels.value[0] || "";
   }
 }
+
+watch([generationMode, textModel, editModel], () => {
+  saveGenerationPreferences({
+    mode: generationMode.value,
+    textModel: textModel.value,
+    editModel: editModel.value,
+  });
+});
 
 async function ensureMe() {
   try {
@@ -166,8 +195,7 @@ function selectConversation(id) {
 }
 
 function clearEditImage({ resetMode = true } = {}) {
-  editImageSrc.value = "";
-  editPreview.value = "";
+  editImageUrls.value = [];
   if (fileInput.value) fileInput.value.value = "";
   if (resetMode) generationMode.value = "text-to-image";
 }
@@ -181,29 +209,46 @@ function pickFile() {
   fileInput.value?.click();
 }
 
-function onFileChange(ev) {
-  const file = ev.target.files?.[0];
-  if (!file) return;
-  if (!file.type.startsWith("image/")) {
+function readImageAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("读取图片失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function onFileChange(ev) {
+  const files = Array.from(ev.target.files || []);
+  if (!files.length) return;
+  if (files.some((file) => !file.type.startsWith("image/"))) {
     error.value = "请上传图片文件";
     return;
   }
-  if (file.size > 8 * 1024 * 1024) {
+  if (files.some((file) => file.size > 8 * 1024 * 1024)) {
     error.value = "图片请小于 8MB";
     return;
   }
+  const remaining = 4 - editImageUrls.value.length;
+  if (remaining <= 0) {
+    error.value = "最多上传 4 张图片";
+    return;
+  }
   error.value = "";
-  const reader = new FileReader();
-  reader.onload = () => {
-    const dataUrl = String(reader.result || "");
-    editImageSrc.value = dataUrl;
-    editPreview.value = dataUrl;
+  try {
+    const imageUrls = await Promise.all(files.slice(0, remaining).map(readImageAsDataUrl));
+    editImageUrls.value.push(...imageUrls);
     generationMode.value = "image-to-image";
-  };
-  reader.onerror = () => {
+    if (files.length > remaining) error.value = "最多上传 4 张图片";
+  } catch {
     error.value = "读取图片失败";
-  };
-  reader.readAsDataURL(file);
+  } finally {
+    if (fileInput.value) fileInput.value.value = "";
+  }
+}
+
+function removeEditImage(index) {
+  editImageUrls.value.splice(index, 1);
 }
 
 function scrollBottom() {
@@ -225,7 +270,7 @@ function retryImage(event) {
 async function send() {
   const text = prompt.value.trim();
   if (!text || sending.value) return;
-  if (isEditMode.value && !editImageSrc.value) {
+  if (isEditMode.value && !editImageUrls.value.length) {
     error.value = "图生图请先上传参考图";
     return;
   }
@@ -241,11 +286,11 @@ async function send() {
     id: "pending-" + Date.now(),
     role: "user",
     content: text,
-    ref_image_url: editImageSrc.value || undefined,
+    ref_image_url: editImageUrls.value[0] || undefined,
   };
   messages.value.push(optimisticUserMsg);
   prompt.value = "";
-  const refImage = editImageSrc.value;
+  const refImages = [...editImageUrls.value];
   const requestModel = selectedModel.value || undefined;
   clearEditImage();
   await nextTick();
@@ -260,11 +305,11 @@ async function send() {
 
   try {
     let data;
-    if (refImage) {
+    if (refImages.length) {
       data = await request("/api/edit", {
         method: "POST",
         token: auth.userToken,
-        body: { ...bodyBase, image_url: refImage },
+        body: { ...bodyBase, images: refImages.map((url) => ({ url })) },
       });
     } else {
       data = await request("/api/generate", {
@@ -467,15 +512,36 @@ const handleLoginSuccess = async () => {
           </p>
         </div>
 
-        <div v-if="isEditMode && editImageSrc" class="edit-banner">
+        <div v-if="isEditMode && editImageUrls.length" class="edit-banner">
           <div class="edit-info">
-            <img v-if="editPreview" class="edit-thumb" :src="editPreview" alt="参考" />
+            <div class="edit-thumbs">
+              <div v-for="(imageUrl, index) in editImageUrls" :key="index" class="edit-thumb-wrap">
+                <img class="edit-thumb" :src="imageUrl" :alt="`参考图 ${index + 1}`" />
+                <button
+                  class="edit-thumb-remove"
+                  type="button"
+                  title="移除图片"
+                  :aria-label="`移除参考图 ${index + 1}`"
+                  @click="removeEditImage(index)"
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
             <div>
               <strong>图生图</strong>
-              <div class="muted tiny">将根据参考图与文字说明生成</div>
+              <div class="muted tiny">已选择 {{ editImageUrls.length }} 张参考图</div>
             </div>
           </div>
-          <button class="ghost" type="button" @click="clearEditImage">移除图片</button>
+          <button
+            class="ghost clear-edit-images"
+            type="button"
+            title="清空参考图"
+            aria-label="清空参考图"
+            @click="clearEditImage"
+          >
+            &times;
+          </button>
         </div>
 
         <div class="input-row glass-panel">
@@ -492,6 +558,7 @@ const handleLoginSuccess = async () => {
             ref="fileInput"
             type="file"
             accept="image/*"
+            multiple
             class="hidden-file"
             @change="onFileChange"
           />
@@ -499,9 +566,9 @@ const handleLoginSuccess = async () => {
             v-model="prompt"
             :placeholder="
               isEditMode
-                ? editImageSrc
+                ? editImageUrls.length
                   ? '描述如何修改这张图…'
-                  : '先上传参考图，再描述修改方式…'
+                  : '先上传一张或多张参考图，再描述修改方式…'
                 : '描述你想生成的图片…'
             "
             @keydown.enter.exact.prevent="send"
@@ -845,8 +912,9 @@ const handleLoginSuccess = async () => {
   max-width: 56rem;
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 0;
   padding: 8px 12px;
   border-radius: 0.75rem;
@@ -856,10 +924,23 @@ const handleLoginSuccess = async () => {
 }
 .edit-info {
   display: flex;
+  flex: 1;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   font-size: 13px;
   min-width: 0;
+}
+.edit-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.edit-thumb-wrap {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
 }
 .edit-thumb {
   width: 48px;
@@ -868,6 +949,27 @@ const handleLoginSuccess = async () => {
   border-radius: 0.5rem;
   border: 1px solid var(--border-light);
   flex-shrink: 0;
+}
+.edit-thumb-remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--border-light);
+  border-radius: 50%;
+  background: #121a2c;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 14px;
+}
+.clear-edit-images {
+  min-width: 32px;
+  padding: 4px 10px;
+  font-size: 20px;
+  line-height: 1;
 }
 .tiny { font-size: 12px; margin-top: 2px; }
 

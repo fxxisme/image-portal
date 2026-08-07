@@ -154,11 +154,14 @@ class GenerateRequest(BaseModel):
     model: str | None = None
 
 
+class EditImage(BaseModel):
+    url: str = Field(min_length=1)
+
+
 class EditRequest(BaseModel):
     conversation_id: int
     prompt: str = Field(min_length=1)
-    # 要编辑的参考图 URL（通常来自上一轮 assistant）
-    image_url: str = Field(min_length=1)
+    images: list[EditImage] = Field(min_length=1, max_length=4)
     n: int = Field(default=1, ge=1, le=4)
     model: str | None = None
 

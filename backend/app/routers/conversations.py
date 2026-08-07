@@ -74,8 +74,15 @@ def get_conversation(
     messages = []
     for message in item.messages:
         output = message_to_out(message)
-        if message.id in images_by_message:
-            output.image_urls = [image_content_url(image) for image in images_by_message[message.id]]
+        # 会话详情以生成图片表为唯一来源，避免旧消息字段中的脏数据在刷新后回放。
+        output.image_urls = (
+            [
+                image_content_url(image)
+                for image in images_by_message.get(message.id, [])[: message.cost]
+            ]
+            if message.role == "assistant"
+            else []
+        )
         messages.append(output)
 
     return ConversationDetail(
