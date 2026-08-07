@@ -246,12 +246,12 @@ onBeforeUnmount(stopPolling);
 </template>
 
 <style scoped>
-.video-page { min-height: 100%; padding: 28px; background: var(--bg); }
-.video-header, .video-workspace { width: min(1120px, 100%); margin: 0 auto; }
+.video-page { min-height: 100vh; padding: 28px; display: flex; flex-direction: column; background: var(--bg); }
+.video-header, .video-workspace { width: 100%; max-width: none; margin: 0; }
 .video-header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; padding-bottom: 26px; border-bottom: 1px solid var(--border-light); }
 .video-header h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0; }
 .video-header p { margin: 0; }
-.video-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr); gap: 28px; padding-top: 28px; }
+.video-workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(420px, 0.9fr); gap: 28px; padding-top: 28px; }
 .video-form, .video-result { padding: 22px; border: 1px solid var(--border-light); border-radius: 8px; background: var(--glass-bg); box-shadow: var(--shadow); }
 .video-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px 0 16px; }
@@ -260,7 +260,7 @@ onBeforeUnmount(stopPolling);
 .image-previews { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
 .image-previews img { width: 72px; height: 72px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-light); }
 .video-actions { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
-.video-result { min-height: 360px; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
+.video-result { min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
 .video-result video { width: 100%; max-height: 480px; background: #000; border-radius: 4px; }
 .video-placeholder { min-height: 250px; display: grid; place-content: center; gap: 10px; text-align: center; border: 1px dashed var(--border-light); color: var(--text); }
 .video-tools { display: flex; gap: 10px; align-items: center; }
