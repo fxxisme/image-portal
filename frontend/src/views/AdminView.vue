@@ -33,6 +33,9 @@ const settingsForm = ref({
   default_model: "gpt-image-2",
   text_to_image_models: ["gpt-image-2", "grok-imagine-image"],
   image_to_image_models: ["gpt-image-2"],
+  video_base_url: "",
+  video_api_key: "",
+  video_model: "",
   response_format: "url",
   webdav_url: "",
   webdav_username: "",
@@ -46,6 +49,8 @@ const settingsMeta = ref({
   updated_at: null,
   has_webdav_password: false,
   webdav_password_masked: "",
+  has_video_api_key: false,
+  video_api_key_masked: "",
 });
 
 function uniqueModels(...groups) {
@@ -113,6 +118,9 @@ async function load() {
       image_to_image_models: Array.isArray(s.image_to_image_models)
         ? s.image_to_image_models
         : ["gpt-image-2"],
+      video_base_url: s.video_base_url || "",
+      video_api_key: "",
+      video_model: s.video_model || "",
       response_format: s.response_format || "url",
       webdav_url: s.webdav_url || "",
       webdav_username: s.webdav_username || "",
@@ -126,6 +134,8 @@ async function load() {
       updated_at: s.updated_at,
       has_webdav_password: s.has_webdav_password,
       webdav_password_masked: s.webdav_password_masked || "",
+      has_video_api_key: s.has_video_api_key,
+      video_api_key_masked: s.video_api_key_masked || "",
     };
     if (activeTab.value === "images") await loadImages();
   } catch (e) {
@@ -219,6 +229,8 @@ async function saveSettings() {
       default_model: settingsForm.value.default_model.trim() || "gpt-image-2",
       text_to_image_models: settingsForm.value.text_to_image_models,
       image_to_image_models: settingsForm.value.image_to_image_models,
+      video_base_url: settingsForm.value.video_base_url.trim(),
+      video_model: settingsForm.value.video_model.trim(),
       response_format: settingsForm.value.response_format || "url",
       webdav_url: settingsForm.value.webdav_url.trim(),
       webdav_username: settingsForm.value.webdav_username.trim(),
@@ -227,6 +239,8 @@ async function saveSettings() {
     };
     const keyInput = settingsForm.value.upstream_api_key.trim();
     if (keyInput) body.upstream_api_key = keyInput;
+    const videoKeyInput = settingsForm.value.video_api_key.trim();
+    if (videoKeyInput) body.video_api_key = videoKeyInput;
     const webdavPassword = settingsForm.value.webdav_password.trim();
     if (webdavPassword) body.webdav_password = webdavPassword;
 
@@ -236,6 +250,7 @@ async function saveSettings() {
       body,
     });
     settingsForm.value.upstream_api_key = "";
+    settingsForm.value.video_api_key = "";
     settingsForm.value.webdav_password = "";
     settingsMeta.value = {
       has_upstream_api_key: s.has_upstream_api_key,
@@ -243,6 +258,8 @@ async function saveSettings() {
       updated_at: s.updated_at,
       has_webdav_password: s.has_webdav_password,
       webdav_password_masked: s.webdav_password_masked || "",
+      has_video_api_key: s.has_video_api_key,
+      video_api_key_masked: s.video_api_key_masked || "",
     };
     settingsForm.value.upstream_base_url = s.upstream_base_url || "";
     settingsForm.value.default_model = s.default_model || "gpt-image-2";
@@ -252,6 +269,8 @@ async function saveSettings() {
     settingsForm.value.image_to_image_models = Array.isArray(s.image_to_image_models)
       ? s.image_to_image_models
       : ["gpt-image-2"];
+    settingsForm.value.video_base_url = s.video_base_url || "";
+    settingsForm.value.video_model = s.video_model || "";
     settingsForm.value.response_format = s.response_format || "url";
     settingsForm.value.webdav_url = s.webdav_url || "";
     settingsForm.value.webdav_username = s.webdav_username || "";
@@ -453,6 +472,27 @@ onMounted(load);
             <option value="url">url</option>
             <option value="b64_json">b64_json</option>
           </select>
+        </div>
+      </div>
+
+      <h2 class="subsection-title">视频生成</h2>
+      <p class="muted tip">视频接口独立于图片生成；模型名称由此处手动填写。</p>
+      <div class="settings-grid">
+        <div class="field">
+          <label>视频 Base URL</label>
+          <input v-model="settingsForm.video_base_url" type="url" placeholder="https://api3.fxx365.com" />
+        </div>
+        <div class="field">
+          <label>
+            视频 API Key
+            <span v-if="settingsMeta.has_video_api_key" class="muted">（当前 {{ settingsMeta.video_api_key_masked }}）</span>
+            <span v-else class="muted">（未配置）</span>
+          </label>
+          <input v-model="settingsForm.video_api_key" type="password" placeholder="留空则不修改" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>视频模型</label>
+          <input v-model="settingsForm.video_model" placeholder="grok-imagine-video" />
         </div>
       </div>
 

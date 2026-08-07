@@ -13,6 +13,7 @@
   - WebDAV 图片存储配置与全部生成图片浏览
   - 创建/禁用秘钥、设置额度、用量记录
 - 上游：文生图模型统一使用 `/v1/images/generations`；图生图固定使用 `gpt-image-2` 的 `/v1/images/edits`；成功按张扣额度
+- 视频：独立配置上游 Base URL / API Key / 模型，调用 `/v1/videos/generations` 后轮询 `/v1/videos/{request_id}`；不写入对话、图库或本地存储
 
 ## Docker（单容器）
 
@@ -108,6 +109,8 @@ uvicorn app.main:app --reload --port 8000
 | CRUD | `/api/conversations` | 会话 |
 | POST | `/api/generate` | 文生图 |
 | POST | `/api/edit` | 改图 |
+| POST | `/api/videos/generations` | 创建视频生成任务 |
+| GET | `/api/videos/{request_id}` | 查询视频生成进度和结果 |
 | GET/DELETE | `/api/gallery` | 用户图库（本地或 WebDAV 持久化） |
 | GET | `/api/admin/images` | 管理员查看全部生成图片 |
 

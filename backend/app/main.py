@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import admin, auth, conversations, gallery, images
+from app.routers import admin, auth, conversations, gallery, images, videos
 from app.services.media import media_root
 
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +39,7 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(conversations.router)
 app.include_router(images.router)
+app.include_router(videos.router)
 app.include_router(gallery.router)
 
 # 用户生成图持久化目录（本地/容器均挂载）

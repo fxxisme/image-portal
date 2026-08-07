@@ -39,6 +39,10 @@ class SystemSettingsOut(BaseModel):
     default_model: str
     text_to_image_models: list[str]
     image_to_image_models: list[str]
+    video_base_url: str
+    video_api_key_masked: str
+    has_video_api_key: bool
+    video_model: str
     response_format: str
     webdav_url: str
     webdav_username: str
@@ -56,6 +60,10 @@ class SystemSettingsUpdate(BaseModel):
     default_model: str | None = Field(default=None, max_length=128)
     text_to_image_models: list[str] | None = None
     image_to_image_models: list[str] | None = None
+    video_base_url: str | None = Field(default=None, max_length=512)
+    # 传空或不传 = 不修改现有 key
+    video_api_key: str | None = None
+    video_model: str | None = Field(default=None, max_length=128)
     response_format: str | None = Field(default=None, max_length=32)
     webdav_url: str | None = Field(default=None, max_length=512)
     webdav_username: str | None = Field(default=None, max_length=256)
@@ -182,6 +190,27 @@ class GenerateResponse(BaseModel):
     user_message: MessageOut
     assistant_message: MessageOut
     quota_remaining: int
+
+
+# ---------- Video generation (not persisted) ----------
+class VideoGenerationRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=10000)
+    duration: int = Field(default=8, ge=1, le=120)
+    aspect_ratio: str = Field(default="16:9", min_length=3, max_length=16)
+    resolution: str = Field(default="720p", min_length=2, max_length=32)
+    image: str | None = Field(default=None, max_length=16_000_000)
+    reference_images: list[str] | None = Field(default=None, max_length=4)
+
+
+class VideoGenerationResponse(BaseModel):
+    request_id: str
+
+
+class VideoStatusResponse(BaseModel):
+    status: str
+    model: str | None = None
+    progress: int | float | None = None
+    video: dict | None = None
 
 
 # ---------- Gallery ----------

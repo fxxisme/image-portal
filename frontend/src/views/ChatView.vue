@@ -444,6 +444,7 @@ const handleLoginSuccess = async () => {
           <div class="sub muted">{{ quotaText }}</div>
         </div>
         <div class="bar-actions">
+          <button class="ghost" type="button" @click="router.push({ name: 'video' })">视频生成</button>
           <span class="badge">
             剩余 <strong>{{ auth.me?.quota_remaining ?? "-" }}</strong> 张
           </span>

@@ -113,6 +113,10 @@ class SystemSetting(Base):
     image_to_image_models: Mapped[str] = mapped_column(
         Text, nullable=False, default='["gpt-image-2"]'
     )
+    # 视频生成使用独立上游，不与图片生成配置共用。
+    video_base_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    video_api_key: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    video_model: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     response_format: Mapped[str] = mapped_column(String(32), nullable=False, default="url")
     # 留空时继续使用本地 media；配置后生成结果上传至 WebDAV。
     webdav_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")

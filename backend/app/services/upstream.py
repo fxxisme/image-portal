@@ -43,6 +43,13 @@ class UpstreamConfig:
     response_format: str
 
 
+@dataclass
+class VideoUpstreamConfig:
+    base_url: str
+    api_key: str
+    model: str
+
+
 def normalize_base(raw: str) -> str:
     base = (raw or "").strip().rstrip("/")
     if base.lower().endswith("/v1"):
@@ -60,11 +67,29 @@ def load_upstream_config(db: Session) -> UpstreamConfig:
     )
 
 
+def load_video_upstream_config(db: Session) -> VideoUpstreamConfig:
+    row = get_or_create_settings(db)
+    return VideoUpstreamConfig(
+        base_url=row.video_base_url or "",
+        api_key=row.video_api_key or "",
+        model=row.video_model or "",
+    )
+
+
 def _require_config(cfg: UpstreamConfig) -> None:
     if not cfg.base_url.strip():
         raise UpstreamError("未配置上游地址，请在管理后台填写 Upstream Base URL")
     if not cfg.api_key.strip():
         raise UpstreamError("未配置上游 API Key，请在管理后台填写")
+
+
+def _require_video_config(cfg: VideoUpstreamConfig) -> None:
+    if not cfg.base_url.strip():
+        raise UpstreamError("未配置视频上游地址，请在管理后台填写")
+    if not cfg.api_key.strip():
+        raise UpstreamError("未配置视频上游 API Key，请在管理后台填写")
+    if not cfg.model.strip():
+        raise UpstreamError("未配置视频模型，请在管理后台填写")
 
 
 async def fetch_upstream_models(db: Session) -> list[str]:
@@ -145,6 +170,20 @@ async def _post_json(url: str, *, headers: dict, json: dict) -> httpx.Response:
     raise UpstreamError("上游重定向次数过多")
 
 
+async def _get_json(url: str, *, headers: dict) -> httpx.Response:
+    settings = get_settings()
+    try:
+        async with httpx.AsyncClient(
+            timeout=settings.upstream_timeout_seconds,
+            follow_redirects=True,
+        ) as client:
+            return await client.get(url, headers=headers)
+    except httpx.TimeoutException as exc:
+        raise UpstreamError("上游查询超时") from exc
+    except httpx.HTTPError as exc:
+        raise UpstreamError(f"上游查询网络错误: {exc}") from exc
+
+
 async def images_generations(
     db: Session,
     *,
@@ -217,6 +256,69 @@ async def images_edits(
     res = await _post_json(endpoint, headers=headers, json=body)
 
     return _extract_urls(res)
+
+
+def _parse_video_response(res: httpx.Response) -> dict[str, Any]:
+    try:
+        data = res.json() if res.text else None
+    except ValueError:
+        data = None
+    if res.status_code >= 400:
+        raise UpstreamError(
+            f"视频上游返回 HTTP {res.status_code}",
+            status_code=res.status_code,
+            body=data if data is not None else res.text,
+        )
+    if not isinstance(data, dict):
+        raise UpstreamError("视频上游返回格式无效", body=data)
+    return data
+
+
+async def videos_generations(
+    db: Session,
+    *,
+    prompt: str,
+    duration: int,
+    aspect_ratio: str,
+    resolution: str,
+    image: str | None = None,
+    reference_images: list[str] | None = None,
+) -> str:
+    cfg = load_video_upstream_config(db)
+    _require_video_config(cfg)
+    body: dict[str, Any] = {
+        "model": cfg.model,
+        "prompt": prompt,
+        "duration": duration,
+        "aspect_ratio": aspect_ratio,
+        "resolution": resolution,
+    }
+    if image:
+        body["image"] = image
+    if reference_images:
+        body["reference_images"] = reference_images
+
+    endpoint = f"{normalize_base(cfg.base_url)}/v1/videos/generations"
+    data = _parse_video_response(
+        await _post_json(
+            endpoint,
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {cfg.api_key}"},
+            json=body,
+        )
+    )
+    request_id = str(data.get("request_id") or "").strip()
+    if not request_id:
+        raise UpstreamError("视频上游成功但未返回 request_id", body=data)
+    return request_id
+
+
+async def videos_retrieve(db: Session, *, request_id: str) -> dict[str, Any]:
+    cfg = load_video_upstream_config(db)
+    _require_video_config(cfg)
+    endpoint = f"{normalize_base(cfg.base_url)}/v1/videos/{request_id}"
+    return _parse_video_response(
+        await _get_json(endpoint, headers={"Authorization": f"Bearer {cfg.api_key}"})
+    )
 
 
 def _extract_urls(res: httpx.Response) -> list[str]:

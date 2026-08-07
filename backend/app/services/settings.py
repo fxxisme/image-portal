@@ -48,6 +48,9 @@ def get_or_create_settings(db: Session) -> SystemSetting:
             default_model="gpt-image-2",
             text_to_image_models=json.dumps(DEFAULT_TEXT_TO_IMAGE_MODELS),
             image_to_image_models=json.dumps(DEFAULT_IMAGE_TO_IMAGE_MODELS),
+            video_base_url="",
+            video_api_key="",
+            video_model="",
             response_format="url",
             webdav_url="",
             webdav_username="",
@@ -78,6 +81,9 @@ def apply_settings_update(
     default_model: str | None = None,
     text_to_image_models: list[str] | None = None,
     image_to_image_models: list[str] | None = None,
+    video_base_url: str | None = None,
+    video_api_key: str | None = None,
+    video_model: str | None = None,
     response_format: str | None = None,
     webdav_url: str | None = None,
     webdav_username: str | None = None,
@@ -101,6 +107,12 @@ def apply_settings_update(
         row.image_to_image_models = _dump_model_names(
             image_to_image_models, DEFAULT_IMAGE_TO_IMAGE_MODELS
         )
+    if video_base_url is not None:
+        row.video_base_url = video_base_url.strip()
+    if video_api_key is not None and video_api_key.strip() != "":
+        row.video_api_key = video_api_key.strip()
+    if video_model is not None:
+        row.video_model = video_model.strip()
     if response_format is not None:
         row.response_format = response_format.strip() or "url"
     if webdav_url is not None:
