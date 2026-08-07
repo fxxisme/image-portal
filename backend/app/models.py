@@ -74,6 +74,12 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+    generated_images: Mapped[list["GeneratedImage"]] = relationship(
+        back_populates="message",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="GeneratedImage.id",
+    )
 
 
 class UsageLog(Base):
@@ -124,8 +130,13 @@ class GeneratedImage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     api_key_id: Mapped[int] = mapped_column(ForeignKey("api_keys.id", ondelete="CASCADE"), index=True)
-    conversation_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # 图片只属于产生它的助手消息；会话删除时一并删除，不能留下可复用 ID 的孤儿记录。
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     # generate | edit
     action: Mapped[str] = mapped_column(String(32), nullable=False, default="generate")
     prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -139,3 +150,4 @@ class GeneratedImage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     api_key: Mapped["ApiKey"] = relationship(back_populates="generated_images")
+    message: Mapped["Message | None"] = relationship(back_populates="generated_images")
