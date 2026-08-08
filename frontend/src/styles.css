@@ -1,43 +1,39 @@
-/* =====================================================
-   VisionaryAI Design System — inspired by risk-1.html
-   ===================================================== */
+/* Shared graphite workbench design tokens. */
 
 :root {
   color-scheme: dark;
 
-  /* ---- surface layers (darkest → brightest) ---- */
-  --bg:            #0b1326;
-  --bg-2:          #060e20;
-  --card:          #131b2e;
-  --sidebar:       #0b1326;
-  --input:         #0c1224;
-  --border:        #494454;
-  --border-light:  rgba(149, 142, 160, 0.2);
+  --bg:            #101310;
+  --bg-2:          #151a15;
+  --card:          #1b201b;
+  --sidebar:       #171b17;
+  --input:         #171d17;
+  --border:        #3a443a;
+  --border-light:  rgba(138, 157, 137, 0.24);
 
   /* ---- text ---- */
-  --text:          #dae2fd;
-  --muted:         #cbc3d7;
-  --muted-2:       #958ea0;
+  --text:          #edf2e9;
+  --muted:         #aab5a9;
+  --muted-2:       #748074;
 
-  /* ---- brand (prismatic purple-blue gradient) ---- */
-  --primary:       #d0bcff;
-  --primary-2:     #a078ff;
-  --secondary:     #adc6ff;
-  --secondary-2:   #0566d9;
-  --tertiary:      #ffafd3;
+  --primary:       #a7d85a;
+  --primary-2:     #7eaf45;
+  --secondary:     #91d3cb;
+  --secondary-2:   #5faaa1;
+  --tertiary:      #e9b65a;
 
   /* ---- functional ---- */
-  --accent:        #d0bcff;
-  --accent-2:      #3dd68c;
-  --danger:        #ffb4ab;
-  --danger-bg:     #93000a;
-  --warn:          #f0b429;
+  --accent:        #a7d85a;
+  --accent-2:      #91d3cb;
+  --danger:        #ffb4a9;
+  --danger-bg:     #6f322c;
+  --warn:          #e9b65a;
 
   /* ---- effects ---- */
-  --glass-bg:      rgba(19, 27, 46, 0.6);
-  --glass-border:  rgba(149, 142, 160, 0.2);
-  --shadow:        0 12px 40px rgba(0, 0, 0, 0.35);
-  --prismatic:     linear-gradient(135deg, #d0bcff 0%, #a078ff 50%, #adc6ff 100%);
+  --glass-bg:      rgba(27, 32, 27, 0.92);
+  --glass-border:  rgba(138, 157, 137, 0.24);
+  --shadow:        0 14px 32px rgba(0, 0, 0, 0.22);
+  --prismatic:     #a7d85a;
 
   /* ---- typography ---- */
   --font-body:     "Geist", system-ui, -apple-system, sans-serif;
@@ -86,21 +82,21 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* primary — prismatic gradient */
 button.primary {
   background: var(--prismatic);
-  color: #23005c;
-  font-family: var(--font-mono);
-  font-weight: 500;
-  letter-spacing: 0.03em;
-  box-shadow: 0 4px 20px rgba(160, 120, 255, 0.25);
+  color: #17200f;
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: 0;
+  box-shadow: none;
 }
 button.primary:hover:not(:disabled) {
-  opacity: 0.92;
-  transform: scale(1.02);
+  background: #b8e868;
+  opacity: 1;
+  transform: translateY(-1px);
 }
 button.primary:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: translateY(0);
 }
 
 /* ghost — transparent bordered */
@@ -111,45 +107,45 @@ button.ghost {
   font-family: var(--font-body);
 }
 button.ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
+  background: #222922;
   color: var(--text);
   border-color: var(--muted-2);
 }
 
 /* danger */
 button.danger {
-  background: rgba(255, 180, 171, 0.12);
+  background: #38221f;
   color: var(--danger);
-  border: 1px solid rgba(255, 180, 171, 0.3);
+  border: 1px solid #7c4039;
 }
 button.danger:hover:not(:disabled) {
-  background: rgba(255, 180, 171, 0.22);
+  background: #4a2a25;
 }
 
 /* success */
 button.success {
-  background: rgba(61, 214, 140, 0.12);
-  color: #b8f5d4;
-  border: 1px solid rgba(61, 214, 140, 0.3);
+  background: #1d332b;
+  color: #b9ebe0;
+  border: 1px solid #4f8176;
 }
 button.success:hover:not(:disabled) {
-  background: rgba(61, 214, 140, 0.22);
+  background: #254138;
 }
 
 /* ---- form inputs ---- */
 input, textarea, select {
   width: 100%;
   border: 1px solid var(--border-light);
-  background: rgba(12, 18, 36, 0.7);
+  background: var(--input);
   color: var(--text);
-  border-radius: 0.75rem;
+  border-radius: 6px;
   padding: 10px 14px;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 input:focus, textarea:focus, select:focus {
-  border-color: var(--primary-2);
-  box-shadow: 0 0 0 3px rgba(160, 120, 255, 0.15);
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(145, 211, 203, 0.12);
 }
 textarea {
   resize: vertical;
@@ -162,21 +158,21 @@ textarea {
 /* ---- card ---- */
 .card {
   background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid var(--glass-border);
-  border-radius: 1rem;
+  border-radius: 8px;
   padding: 20px;
   box-shadow: var(--shadow);
 }
 
 /* ---- glass panel (stronger blur) ---- */
 .glass-panel {
-  background: rgba(19, 27, 46, 0.55);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(149, 142, 160, 0.18);
-  border-radius: 1.25rem;
+  background: var(--glass-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
 }
 
 /* ---- utilities ---- */
@@ -198,10 +194,10 @@ textarea {
 
 /* error notice */
 .err {
-  color: #ffdad6;
-  background: rgba(147, 0, 10, 0.35);
-  border: 1px solid rgba(255, 180, 171, 0.35);
-  border-radius: 0.75rem;
+  color: #ffd7d1;
+  background: #38221f;
+  border: 1px solid #7c4039;
+  border-radius: 6px;
   padding: 10px 14px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -210,7 +206,7 @@ textarea {
 
 /* success notice */
 .ok {
-  color: #b8f5d4;
+  color: #b9ebe0;
   font-size: 13px;
 }
 
@@ -220,16 +216,16 @@ textarea {
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  border-radius: 999px;
+  border-radius: 5px;
   border: 1px solid var(--border-light);
-  background: rgba(19, 27, 46, 0.6);
-  backdrop-filter: blur(8px);
+  background: var(--surface, #1b201b);
+  backdrop-filter: none;
   font-size: 12px;
   color: var(--muted);
   font-family: var(--font-body);
 }
 .badge strong {
-  color: var(--accent-2);
+  color: var(--primary);
   font-weight: 700;
 }
 
@@ -256,5 +252,5 @@ textarea {
 /* scrollbar */
 ::-webkit-scrollbar          { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track    { background: transparent; }
-::-webkit-scrollbar-thumb    { background: rgba(149, 142, 160, 0.3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(149, 142, 160, 0.5); }
+::-webkit-scrollbar-thumb    { background: #526052; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #718071; }

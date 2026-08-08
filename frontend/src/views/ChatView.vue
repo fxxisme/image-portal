@@ -179,7 +179,7 @@ function createConversation() {
   currentId.value = item.id;
   messages.value = item.messages;
   saveBrowserConversations();
-  clearEditImage();
+  clearEditImage({ resetMode: false });
 }
 
 function removeConversation(id) {
@@ -198,7 +198,7 @@ function selectConversation(id) {
   if (!conversation) return;
   currentId.value = conversation.id;
   messages.value = conversation.messages;
-  clearEditImage();
+  clearEditImage({ resetMode: false });
   nextTick(scrollBottom);
 }
 
@@ -329,7 +329,7 @@ async function send() {
     prompt.value = "";
     const refImages = [...editImageUrls.value];
     const requestModel = selectedModel.value || undefined;
-    clearEditImage();
+    clearEditImage({ resetMode: false });
     await nextTick();
     if (currentId.value === localConversationId) scrollBottom();
 
@@ -417,16 +417,15 @@ const handleLoginSuccess = async () => {
 
 <template>
   <div class="shell">
-    <!-- atmosphere blobs -->
-    <div class="atmo">
-      <div class="blob blob-1" />
-      <div class="blob blob-2" />
-    </div>
-
-    <!-- ====== sidebar ====== -->
     <aside class="sidebar">
       <div class="side-top">
-        <div class="brand">对话生图</div>
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true"><i /><i /><i /></span>
+          <div>
+            <div class="brand">对话生图</div>
+            <div class="brand-caption">IMAGE WORKSPACE</div>
+          </div>
+        </div>
       </div>
 
       <button class="primary new-chat-btn" type="button" @click="createConversation">
@@ -434,6 +433,7 @@ const handleLoginSuccess = async () => {
       </button>
 
       <div class="conv-list">
+        <div class="section-label">最近创作</div>
         <button
           v-for="c in conversations"
           :key="c.id"
@@ -450,18 +450,16 @@ const handleLoginSuccess = async () => {
       </div>
     </aside>
 
-    <!-- ====== main ====== -->
     <main class="main">
-      <!-- top bar -->
       <header class="bar glass-bar">
         <div class="bar-title">
-          <div class="title">对话生图</div>
-          <div class="sub muted">{{ quotaText }}</div>
+          <div class="title-kicker">创作空间</div>
+          <div class="title">图像生成</div>
         </div>
         <div class="bar-actions">
-          <button class="ghost" type="button" @click="router.push({ name: 'video' })">视频生成</button>
-          <span class="badge">
-            剩余 <strong>{{ auth.me?.quota_remaining ?? "-" }}</strong> 张
+          <span class="quota-status" :title="quotaText">
+            <span class="quota-dot" />
+            <span>剩余 <strong>{{ auth.me?.quota_remaining ?? "-" }}</strong> 张</span>
           </span>
           <span v-if="showZeroWarning" class="badge warn">剩余 0 张</span>
           <button
@@ -472,7 +470,7 @@ const handleLoginSuccess = async () => {
           >
             重新输入秘钥
           </button>
-          <span class="badge" v-if="auth.me?.name">{{ auth.me.name }}</span>
+          <span class="user-name" v-if="auth.me?.name">{{ auth.me.name }}</span>
         </div>
       </header>
 
@@ -485,10 +483,11 @@ const handleLoginSuccess = async () => {
 
       <div v-if="error" class="err ban">{{ error }}</div>
 
-      <!-- messages -->
       <div ref="scroller" class="messages">
         <div v-if="!messages.length" class="center tip">
-          输入描述即可生图；上传图片后可改图。成功出图会扣额度。
+          <span class="empty-mark" aria-hidden="true"><i /><i /><i /></span>
+          <strong>从一个画面开始</strong>
+          <span>输入描述，或切换到图生图继续创作。</span>
         </div>
 
         <div v-for="m in messages" :key="m.id" class="msg" :class="m.role">
@@ -520,7 +519,6 @@ const handleLoginSuccess = async () => {
         </div>
       </div>
 
-      <!-- ====== composer area (matching risk-1.html style) ====== -->
       <div class="composer-area">
         <div class="composer-toolbar">
           <div class="composer-mode">
@@ -546,8 +544,8 @@ const handleLoginSuccess = async () => {
             </div>
           </div>
           <p class="hint">
-            <span class="hint-icon">ⓘ</span>
-            生成可能需要一些时间。失败不扣额度。
+            <span class="hint-icon">●</span>
+            成功生成后扣除额度
           </p>
         </div>
 
@@ -614,11 +612,14 @@ const handleLoginSuccess = async () => {
             @paste="onPromptPaste"
             rows="1"
           />
-          <select v-model="selectedModel" class="model-select" aria-label="生图模型">
-            <option v-for="modelName in modelOptions" :key="modelName" :value="modelName">
-              {{ modelName }}
-            </option>
-          </select>
+          <label class="model-field">
+            <span>模型</span>
+            <select v-model="selectedModel" class="model-select" aria-label="生图模型">
+              <option v-for="modelName in modelOptions" :key="modelName" :value="modelName">
+                {{ modelName }}
+              </option>
+            </select>
+          </label>
           <button
             class="send-btn"
             type="button"
@@ -645,39 +646,11 @@ const handleLoginSuccess = async () => {
   overflow: hidden;
 }
 
-/* atmosphere */
-.atmo {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.18;
-}
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(120px);
-}
-.blob-1 {
-  top: 15%;
-  right: -5%;
-  width: 450px;
-  height: 450px;
-  background: var(--primary);
-}
-.blob-2 {
-  bottom: 8%;
-  left: -10%;
-  width: 360px;
-  height: 360px;
-  background: var(--secondary);
-}
-
 /* ========= sidebar ========= */
 .sidebar {
   position: relative;
   z-index: 2;
-  background: rgba(6, 14, 32, 0.75);
+  background: #171b17;
   backdrop-filter: blur(16px);
   border-right: 1px solid rgba(149, 142, 160, 0.15);
   display: flex;
@@ -840,8 +813,8 @@ const handleLoginSuccess = async () => {
   padding: 14px 16px;
 }
 .bubble.user {
-  background: rgba(160, 120, 255, 0.12);
-  border: 1px solid rgba(160, 120, 255, 0.2);
+  background: #273023;
+  border: 1px solid #455440;
 }
 .bubble.assistant {
   background: rgba(19, 27, 46, 0.55);
@@ -938,12 +911,12 @@ const handleLoginSuccess = async () => {
 }
 .mode-option:hover { color: var(--text); }
 .mode-option.active {
-  background: rgba(208, 188, 255, 0.16);
+  background: #344229;
   color: var(--text);
-  box-shadow: inset 0 0 0 1px rgba(208, 188, 255, 0.24);
+  box-shadow: inset 0 0 0 1px #4f6738;
 }
 .mode-option:focus-visible {
-  outline: 2px solid rgba(208, 188, 255, 0.7);
+  outline: 2px solid var(--secondary);
   outline-offset: 2px;
 }
 
@@ -1024,8 +997,8 @@ const handleLoginSuccess = async () => {
   transition: box-shadow 0.2s, border-color 0.2s;
 }
 .input-row:focus-within {
-  box-shadow: 0 0 0 2px rgba(208, 188, 255, 0.25);
-  border-color: rgba(208, 188, 255, 0.35);
+  box-shadow: 0 0 0 2px rgba(145, 211, 203, 0.12);
+  border-color: var(--secondary);
 }
 
 .attach-btn {
@@ -1087,7 +1060,7 @@ const handleLoginSuccess = async () => {
   font-size: 15px;
   font-family: var(--font-body);
   font-weight: 600;
-  box-shadow: 0 4px 20px rgba(160, 120, 255, 0.25);
+  box-shadow: none;
   transition: all 0.2s;
 }
 .send-btn:hover:not(:disabled) {
@@ -1203,5 +1176,390 @@ const handleLoginSuccess = async () => {
     flex: 1;
     width: auto;
   }
+}
+</style>
+
+<style scoped>
+.shell {
+  --canvas: #101310;
+  --rail: #171b17;
+  --surface: #1b201b;
+  --surface-raised: #222922;
+  --line: #343c34;
+  --line-strong: #4a574a;
+  --ink: #edf2e9;
+  --subtle: #aab5a9;
+  --quiet: #748074;
+  --signal: #a7d85a;
+  --signal-deep: #18220e;
+  --aqua: #91d3cb;
+  --amber: #e9b65a;
+  --danger-soft: #ffb4a9;
+  background: var(--canvas);
+  color: var(--ink);
+  grid-template-columns: 248px minmax(0, 1fr);
+  letter-spacing: 0;
+}
+
+.sidebar {
+  z-index: 1;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+  backdrop-filter: none;
+}
+
+.side-top { padding: 22px 18px 18px; }
+.brand-lockup { display: flex; align-items: center; gap: 11px; }
+.brand-mark,
+.empty-mark {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 5px);
+  gap: 3px;
+}
+.brand-mark i,
+.empty-mark i {
+  display: block;
+  width: 5px;
+  height: 18px;
+  background: var(--signal);
+}
+.brand-mark i:nth-child(2),
+.empty-mark i:nth-child(2) { background: var(--aqua); height: 12px; align-self: end; }
+.brand-mark i:nth-child(3),
+.empty-mark i:nth-child(3) { background: var(--amber); height: 8px; align-self: end; }
+.brand {
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  -webkit-text-fill-color: currentColor;
+}
+.brand-caption {
+  margin-top: 3px;
+  color: var(--quiet);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1;
+}
+
+.new-chat-btn {
+  width: calc(100% - 36px);
+  min-height: 40px;
+  margin: 0 18px 22px;
+  padding: 9px 12px;
+  border: 1px solid #bbeb70;
+  border-radius: 6px;
+  background: var(--signal);
+  box-shadow: none;
+  color: var(--signal-deep);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.new-chat-btn:hover:not(:disabled) {
+  background: #b8e867;
+  opacity: 1;
+  transform: translateY(-1px);
+}
+.new-chat-btn:active:not(:disabled) { transform: translateY(0); }
+.conv-list { padding: 0 10px 12px; }
+.section-label {
+  padding: 0 8px 8px;
+  color: var(--quiet);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.conv-item {
+  min-height: 60px;
+  margin-bottom: 2px;
+  padding: 10px 28px 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--subtle);
+}
+.conv-item:hover { background: #202620; }
+.conv-item.active {
+  border-color: #3d4d3c;
+  border-right: 1px solid #3d4d3c;
+  background: #262f24;
+  color: var(--ink);
+}
+.conv-item.active::before {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  background: var(--signal);
+  content: "";
+}
+.conv-title { font-size: 13px; font-weight: 600; padding: 0; }
+.conv-meta { margin-top: 5px; color: var(--quiet); font-size: 10px; }
+.del { top: 50%; right: 5px; padding: 3px 5px; transform: translateY(-50%); color: var(--quiet); }
+.del:hover { background: #352521; color: var(--danger-soft); }
+.empty { padding: 20px 8px; color: var(--quiet); }
+
+.main { z-index: 1; height: 100dvh; background: var(--canvas); }
+.bar {
+  min-height: 76px;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--canvas);
+}
+.glass-bar { background: var(--canvas); backdrop-filter: none; }
+.bar-title { display: block; }
+.title-kicker {
+  margin-bottom: 4px;
+  color: var(--aqua);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.title { color: var(--ink); font-family: var(--font-body); font-size: 20px; font-weight: 700; }
+.bar-actions { gap: 10px; }
+.quota-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--subtle);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.quota-status strong { color: var(--signal); font-family: var(--font-mono); font-size: 13px; }
+.quota-dot { width: 7px; height: 7px; background: var(--signal); border-radius: 50%; }
+.bar-actions .badge {
+  padding: 5px 8px;
+  border-radius: 4px;
+  border-color: #755839;
+  background: #30261a;
+  color: #f1c778;
+}
+.bar-actions .ghost {
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  border-color: var(--line-strong);
+  color: var(--subtle);
+  font-size: 12px;
+}
+.bar-actions .ghost:hover:not(:disabled) { border-color: var(--aqua); background: #1d2725; color: var(--ink); }
+.user-name {
+  max-width: 120px;
+  overflow: hidden;
+  color: var(--quiet);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ban {
+  margin: 12px 28px 0;
+  border-radius: 5px;
+  background: #38221f;
+  border-color: #7c4039;
+  color: #ffd7d1;
+}
+
+.messages { padding: 32px clamp(24px, 5vw, 72px); }
+.center { padding: 72px 20px; }
+.tip {
+  display: grid;
+  justify-items: center;
+  max-width: 360px;
+  color: var(--quiet);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.tip .empty-mark { margin-bottom: 18px; }
+.tip strong { margin-bottom: 4px; color: var(--ink); font-size: 17px; }
+.msg { margin-bottom: 20px; }
+.bubble {
+  max-width: min(760px, 88%);
+  padding: 14px 16px;
+  border-radius: 6px;
+  box-shadow: none;
+}
+.bubble.user { background: #273023; border: 1px solid #455440; }
+.bubble.assistant { background: var(--surface); border: 1px solid var(--line); backdrop-filter: none; }
+.role-tag { margin-bottom: 7px; color: var(--aqua); font-size: 10px; letter-spacing: 0; }
+.bubble.user .role-tag { color: var(--signal); }
+.content { color: var(--ink); font-size: 14px; line-height: 1.65; }
+.ref-thumb img { border-radius: 5px; border-color: var(--line-strong); }
+.imgs { gap: 10px; }
+.img-card img { border-radius: 5px; border-color: var(--line); background: #0b0e0b; }
+.cost { color: var(--amber); font-family: var(--font-mono); font-size: 11px; }
+.loading-bubble { min-width: 70px; background: var(--surface); }
+.dot { width: 6px; height: 6px; background: var(--signal); }
+
+.composer-area {
+  gap: 9px;
+  padding: 12px 28px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--rail);
+}
+.composer-toolbar,
+.edit-banner,
+.input-row { max-width: 920px; }
+.composer-toolbar { min-height: 36px; }
+.mode-switch {
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #121712;
+}
+.mode-option {
+  min-width: 82px;
+  padding: 7px 12px;
+  border-radius: 4px;
+  color: var(--quiet);
+  font-size: 12px;
+}
+.mode-option:hover { color: var(--ink); }
+.mode-option.active {
+  background: #344229;
+  box-shadow: none;
+  color: #ddf7b2;
+}
+.mode-option:focus-visible,
+.attach-btn:focus-visible,
+.send-btn:focus-visible,
+.edit-thumb-remove:focus-visible,
+.clear-edit-images:focus-visible,
+.new-chat-btn:focus-visible,
+.conv-item:focus-visible { outline: 2px solid var(--aqua); outline-offset: 2px; }
+.hint { color: var(--quiet); font-size: 11px; }
+.hint-icon { color: var(--signal); font-size: 8px; opacity: 1; }
+.edit-banner {
+  padding: 9px 10px;
+  border: 1px solid #485c3d;
+  border-radius: 6px;
+  background: #202a1d;
+  backdrop-filter: none;
+}
+.edit-info { color: var(--subtle); font-size: 12px; }
+.edit-info strong { color: var(--ink); }
+.edit-thumb-wrap, .edit-thumb { width: 44px; height: 44px; }
+.edit-thumb { border-radius: 4px; border-color: #596851; }
+.edit-thumb-remove {
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: #172017;
+  color: var(--ink);
+}
+.clear-edit-images { min-width: 28px; padding: 2px 7px; border-color: transparent; color: var(--subtle); }
+.clear-edit-images:hover:not(:disabled) { background: #352521; color: var(--danger-soft); }
+.tiny { color: var(--quiet); }
+
+.input-row {
+  gap: 10px;
+  min-height: 76px;
+  padding: 7px 8px 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface-raised);
+  backdrop-filter: none;
+}
+.input-row:focus-within { border-color: var(--aqua); box-shadow: 0 0 0 2px rgba(145, 211, 203, 0.12); }
+.attach-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  color: var(--subtle);
+}
+.attach-btn:hover { background: #2e3a2c; border-color: var(--signal); color: var(--signal); }
+.attach-icon { font-size: 20px; }
+.input-row textarea {
+  min-height: 52px;
+  padding: 9px 2px;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+  font-size: 14px;
+}
+.input-row textarea:focus { box-shadow: none; }
+.model-field {
+  display: grid;
+  flex: 0 0 166px;
+  gap: 3px;
+  color: var(--quiet);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+.model-select {
+  width: 166px;
+  min-height: 38px;
+  padding: 7px 26px 7px 9px;
+  border-color: var(--line-strong);
+  border-radius: 5px;
+  background: #171d17;
+  color: var(--subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.model-select:focus { border-color: var(--aqua); box-shadow: none; }
+.send-btn {
+  min-width: 108px;
+  min-height: 48px;
+  justify-content: center;
+  padding: 10px 15px;
+  border: 1px solid #bbeb70;
+  border-radius: 5px;
+  background: var(--signal);
+  box-shadow: none;
+  color: var(--signal-deep);
+  font-size: 13px;
+}
+.send-btn:hover:not(:disabled) { background: #b8e867; opacity: 1; transform: translateY(-1px); }
+.send-btn:active:not(:disabled) { transform: translateY(0); }
+.send-btn:disabled { background: #303830; border-color: #3c453c; color: #7e897e; }
+.bolt { color: #52623a; font-size: 13px; }
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; height: auto; min-height: 100dvh; }
+  .sidebar { max-height: none; border-right: 0; border-bottom: 1px solid var(--line); }
+  .side-top { padding: 14px 16px 10px; }
+  .new-chat-btn { width: auto; margin: 0 16px 12px; }
+  .conv-list { display: flex; gap: 6px; overflow-x: auto; padding: 0 16px 12px; }
+  .section-label, .conv-meta, .del { display: none; }
+  .conv-item { flex: 0 0 150px; min-height: auto; margin: 0; padding: 9px 12px; }
+  .conv-item.active::before { top: auto; right: 12px; bottom: 0; left: 12px; width: auto; height: 2px; }
+  .main { height: auto; min-height: 0; }
+  .bar { min-height: 62px; padding: 10px 16px; }
+  .title { font-size: 17px; }
+  .bar-actions { gap: 6px; }
+  .user-name { display: none; }
+  .messages { min-height: 42dvh; padding: 20px 16px; }
+  .composer-area { padding: 10px 16px 14px; }
+  .composer-toolbar { gap: 8px; }
+  .mode-switch { width: auto; }
+  .composer-mode { width: auto; }
+  .hint { width: auto; }
+  .input-row { gap: 8px; }
+  .input-row textarea { min-width: calc(100% - 50px); order: 0; }
+  .model-field { flex: 1; order: 2; }
+  .model-select { width: 100%; }
+  .send-btn { order: 3; min-width: 94px; min-height: 40px; }
+}
+
+@media (max-width: 480px) {
+  .quota-status { font-size: 11px; }
+  .bar-actions .ghost { display: none; }
+  .composer-toolbar { align-items: center; }
+  .mode-option { min-width: 72px; }
+  .edit-banner { align-items: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .new-chat-btn,
+  .send-btn,
+  .conv-item,
+  .attach-btn { transition: none; }
+  .dot { animation: none; }
 }
 </style>

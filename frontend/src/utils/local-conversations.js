@@ -21,18 +21,40 @@ function normalizeConversation(value) {
   };
 }
 
+function isInlineImage(value) {
+  return typeof value === "string" && value.startsWith("data:image/");
+}
+
+function toStoredConversation(conversation) {
+  return {
+    ...conversation,
+    messages: (conversation.messages || []).map((message) => {
+      const storedMessage = { ...message };
+      if (isInlineImage(storedMessage.ref_image_url)) delete storedMessage.ref_image_url;
+      if (Array.isArray(storedMessage.image_urls)) {
+        storedMessage.image_urls = storedMessage.image_urls.filter((url) => !isInlineImage(url));
+      }
+      return storedMessage;
+    }),
+  };
+}
+
 export function loadLocalConversations() {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeConversation).filter(Boolean);
+    const conversations = parsed.map(normalizeConversation).filter(Boolean);
+    const storedConversations = conversations.map(toStoredConversation);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storedConversations));
+    return storedConversations;
   } catch {
     return [];
   }
 }
 
 export function saveLocalConversations(conversations) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  const storedConversations = conversations.map(toStoredConversation);
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storedConversations));
 }
 
 export function createLocalConversation() {

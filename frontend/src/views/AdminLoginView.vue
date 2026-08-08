@@ -25,12 +25,6 @@ async function onSubmit() {
 
 <template>
   <div class="page">
-    <!-- atmosphere blobs -->
-    <div class="atmo">
-      <div class="blob blob-1" />
-      <div class="blob blob-2" />
-    </div>
-
     <div class="glass-panel login-card">
       <div class="brand-row">
         <span class="brand-text">VisionaryAI</span>
@@ -79,33 +73,7 @@ async function onSubmit() {
   padding: 24px 16px;
   position: relative;
   overflow: hidden;
-}
-
-.atmo {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.25;
-}
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-}
-.blob-1 {
-  top: 15%;
-  right: -5%;
-  width: 420px;
-  height: 420px;
-  background: var(--primary);
-}
-.blob-2 {
-  bottom: 5%;
-  left: -8%;
-  width: 340px;
-  height: 340px;
-  background: var(--secondary);
+  background: var(--bg);
 }
 
 .login-card {
@@ -125,20 +93,17 @@ async function onSubmit() {
   font-family: var(--font-display);
   font-size: 24px;
   font-weight: 700;
-  background: var(--prismatic);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 .badge-admin {
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.05em;
   color: var(--tertiary);
-  background: rgba(255, 175, 211, 0.1);
-  border: 1px solid rgba(255, 175, 211, 0.2);
+  background: #352b1a;
+  border: 1px solid #735d32;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
 }
 
 h1 {
@@ -155,10 +120,10 @@ h1 {
 }
 
 input {
-  background: rgba(12, 18, 36, 0.6);
+  background: var(--input);
   border: 1px solid var(--border-light);
   padding: 12px 14px;
-  border-radius: 0.75rem;
+  border-radius: 6px;
 }
 
 .foot {

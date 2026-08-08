@@ -400,12 +400,6 @@ onMounted(load);
 
 <template>
   <div class="layout">
-    <!-- atmosphere -->
-    <div class="atmo">
-      <div class="blob blob-1" />
-      <div class="blob blob-2" />
-    </div>
-
     <header class="top">
       <div>
         <h1>
@@ -745,34 +739,7 @@ onMounted(load);
   margin: 0 auto;
   padding: 24px 16px 48px;
   position: relative;
-}
-
-/* atmosphere */
-.atmo {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.16;
-}
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(120px);
-}
-.blob-1 {
-  top: 10%;
-  right: -5%;
-  width: 400px;
-  height: 400px;
-  background: var(--primary);
-}
-.blob-2 {
-  bottom: 5%;
-  left: -8%;
-  width: 320px;
-  height: 320px;
-  background: var(--secondary);
+  background: var(--bg);
 }
 
 /* top */
@@ -798,7 +765,7 @@ onMounted(load);
   padding: 3px;
   border: 1px solid var(--border-light);
   border-radius: 8px;
-  background: rgba(6, 14, 32, 0.5);
+  background: var(--input);
 }
 .admin-tabs button {
   padding: 8px 14px;
@@ -808,7 +775,7 @@ onMounted(load);
 }
 .admin-tabs button:hover { color: var(--text); }
 .admin-tabs button.active {
-  background: rgba(160, 120, 255, 0.18);
+  background: #344229;
   color: var(--text);
 }
 h1 {
@@ -821,20 +788,17 @@ h1 {
 }
 .brand-text {
   font-family: var(--font-display);
-  background: var(--prismatic);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 .admin-chip {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.06em;
   color: var(--tertiary);
-  background: rgba(255, 175, 211, 0.1);
-  border: 1px solid rgba(255, 175, 211, 0.2);
+  background: #352b1a;
+  border: 1px solid #735d32;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
 }
 .top p {
   margin: 4px 0 0;
@@ -889,8 +853,8 @@ h2 {
   min-width: 0;
   padding: 14px;
   border: 1px solid var(--border-light);
-  border-radius: 0.75rem;
-  background: rgba(12, 18, 36, 0.35);
+  border-radius: 6px;
+  background: var(--input);
 }
 .model-config-group h3 {
   margin: 0 0 10px;
@@ -938,8 +902,8 @@ h2 {
 .keyline {
   margin: 10px 0;
   padding: 12px 14px;
-  border-radius: 0.75rem;
-  background: rgba(12, 18, 36, 0.6);
+  border-radius: 6px;
+  background: var(--input);
   border: 1px solid var(--border-light);
   word-break: break-all;
   font-size: 13px;
@@ -975,7 +939,7 @@ h2 {
   overflow: hidden;
   border: 1px solid var(--border-light);
   border-radius: 8px;
-  background: rgba(6, 14, 32, 0.72);
+  background: var(--card);
   color: var(--text);
 }
 .image-item:hover { border-color: var(--primary-2); color: var(--text); }
@@ -1017,7 +981,7 @@ h2 {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(2, 5, 13, 0.78);
+  background: rgba(8, 10, 8, 0.82);
 }
 .preview-dialog {
   width: min(1100px, 100%);
@@ -1053,7 +1017,7 @@ h2 {
   min-height: 0;
   flex: 1;
   object-fit: contain;
-  background: #050814;
+  background: #090c09;
 }
 .preview-prompt {
   max-height: 96px;
@@ -1069,7 +1033,7 @@ h2 {
 .status-pill {
   display: inline-block;
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 12px;
 }
 

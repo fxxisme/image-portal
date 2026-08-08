@@ -1,11 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { apiUrl, request } from "../api/http";
-import { useAuthStore } from "../stores/auth";
 
-const auth = useAuthStore();
-const router = useRouter();
 const prompt = ref("");
 const duration = ref(8);
 const aspectRatio = ref("16:9");
@@ -44,9 +40,10 @@ function resetResult() {
 }
 
 function videoContentUrl(id, download = false) {
-  const params = new URLSearchParams({ access_token: auth.userToken });
+  const params = new URLSearchParams();
   if (download) params.set("download", "true");
-  return apiUrl(`/api/videos/${encodeURIComponent(id)}/content?${params.toString()}`);
+  const query = params.toString();
+  return apiUrl(`/api/videos/${encodeURIComponent(id)}/content${query ? `?${query}` : ""}`);
 }
 
 function readImage(file) {
@@ -95,7 +92,6 @@ async function pollStatus() {
   const pollingRequestId = requestId.value;
   try {
     const data = await request(`/api/videos/${encodeURIComponent(pollingRequestId)}`, {
-      token: auth.userToken,
     });
     if (!polling.value || requestId.value !== pollingRequestId) return;
     status.value = data.status || "";
@@ -133,7 +129,6 @@ async function generate() {
   try {
     const data = await request("/api/videos/generations", {
       method: "POST",
-      token: auth.userToken,
       body: {
         prompt: prompt.value.trim(),
         duration: Number(duration.value),
@@ -154,18 +149,6 @@ async function generate() {
   }
 }
 
-async function ensureMe() {
-  try {
-    await auth.fetchMe();
-  } catch (e) {
-    if (e.status === 401) {
-      auth.logoutUser();
-      router.push({ name: "login" });
-    }
-  }
-}
-
-onMounted(ensureMe);
 onBeforeUnmount(stopPolling);
 </script>
 
@@ -176,7 +159,6 @@ onBeforeUnmount(stopPolling);
         <h1>视频生成</h1>
         <p class="muted">任务和视频仅在当前页面使用，不保存到历史记录。</p>
       </div>
-      <button class="ghost" type="button" :disabled="polling" @click="router.push({ name: 'chat' })">图片生成</button>
     </header>
 
     <section class="video-workspace">
@@ -265,6 +247,6 @@ onBeforeUnmount(stopPolling);
 .video-placeholder { min-height: 250px; display: grid; place-content: center; gap: 10px; text-align: center; border: 1px dashed var(--border-light); color: var(--text); }
 .video-tools { display: flex; gap: 10px; align-items: center; }
 .download-link { display: inline-flex; align-items: center; text-decoration: none; }
-.download-link.primary { background: var(--prismatic); color: #23005c; border-radius: 0.75rem; padding: 10px 16px; font-family: var(--font-mono); font-size: 14px; }
+.download-link.primary { background: var(--primary); color: #17200f; border-radius: 6px; padding: 10px 16px; font-family: var(--font-body); font-size: 14px; font-weight: 700; }
 @media (max-width: 760px) { .video-page { padding: 18px; } .video-workspace { grid-template-columns: 1fr; } .video-options, .upload-row { grid-template-columns: 1fr; } .video-header { align-items: stretch; flex-direction: column; } }
 </style>

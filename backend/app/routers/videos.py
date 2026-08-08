@@ -1,12 +1,10 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_api_key, get_current_api_key_for_token
 from app.config import get_settings
 from app.database import get_db
-from app.models import ApiKey
 from app.schemas import (
     VideoGenerationRequest,
     VideoGenerationResponse,
@@ -26,7 +24,6 @@ settings = get_settings()
 @router.post("/generations", response_model=VideoGenerationResponse)
 async def generate_video(
     body: VideoGenerationRequest,
-    _: ApiKey = Depends(get_current_api_key),
     db: Session = Depends(get_db),
 ) -> VideoGenerationResponse:
     try:
@@ -39,7 +36,6 @@ async def generate_video(
 @router.get("/{request_id}", response_model=VideoStatusResponse)
 async def get_video_status(
     request_id: str,
-    _: ApiKey = Depends(get_current_api_key),
     db: Session = Depends(get_db),
 ) -> VideoStatusResponse:
     try:
@@ -58,12 +54,9 @@ async def get_video_status(
 async def get_video_content(
     request_id: str,
     request: Request,
-    access_token: str = Query(min_length=1),
     download: bool = False,
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
-    # <video> 和下载链接无法携带 Authorization，因此使用当前用户会话令牌鉴权。
-    get_current_api_key_for_token(access_token, db)
     try:
         endpoint, headers = video_content_request(db, request_id=request_id)
     except UpstreamError as exc:

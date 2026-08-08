@@ -11,7 +11,7 @@ const router = createRouter({
   routes: [
     { path: "/login", name: "login", component: LoginView },
     { path: "/", name: "chat", component: ChatView, meta: { requiresUser: true } },
-    { path: "/video", name: "video", component: VideoView, meta: { requiresUser: true } },
+    { path: "/video", name: "video", component: VideoView },
     { path: "/admin/login", name: "admin-login", component: AdminLoginView },
     { path: "/admin", name: "admin", component: AdminView, meta: { requiresAdmin: true } },
   ],
@@ -23,7 +23,7 @@ router.beforeEach((to) => {
 
   if (to.meta.requiresAdmin && !auth.isAdminLoggedIn) return { name: "admin-login" };
   if (to.name === "admin-login" && auth.isAdminLoggedIn) return { name: "admin" };
-  if (apiKey && to.name !== "login") {
+  if (apiKey && to.name !== "login" && to.name !== "video") {
     return { name: "login", query: { apikey: apiKey }, replace: true };
   }
   if (to.name === "login" && auth.isUserLoggedIn && !apiKey) return { name: "chat" };
