@@ -226,8 +226,7 @@ function readImageAsDataUrl(file) {
   });
 }
 
-async function onFileChange(ev) {
-  const files = Array.from(ev.target.files || []);
+async function addEditImages(files) {
   if (!files.length) return;
   if (files.some((file) => !file.type.startsWith("image/"))) {
     error.value = "请上传图片文件";
@@ -253,6 +252,22 @@ async function onFileChange(ev) {
   } finally {
     if (fileInput.value) fileInput.value.value = "";
   }
+}
+
+function onFileChange(ev) {
+  addEditImages(Array.from(ev.target.files || []));
+}
+
+function onPromptPaste(ev) {
+  if (!isEditMode.value) return;
+  const files = Array.from(ev.clipboardData?.items || [])
+    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+    .map((item) => item.getAsFile())
+    .filter(Boolean);
+  if (!files.length) return;
+
+  ev.preventDefault();
+  addEditImages(files);
 }
 
 function removeEditImage(index) {
@@ -592,10 +607,11 @@ const handleLoginSuccess = async () => {
               isEditMode
                 ? editImageUrls.length
                   ? '描述如何修改这张图…'
-                  : '先上传一张或多张参考图，再描述修改方式…'
+                  : '上传或粘贴一张或多张参考图，再描述修改方式…'
                 : '描述你想生成的图片…'
             "
             @keydown.enter.exact.prevent="send"
+            @paste="onPromptPaste"
             rows="1"
           />
           <select v-model="selectedModel" class="model-select" aria-label="生图模型">
