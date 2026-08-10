@@ -428,8 +428,15 @@ const handleLoginSuccess = async () => {
         </div>
       </div>
 
-      <button class="primary new-chat-btn" type="button" @click="createConversation">
-        ＋ 新建对话
+      <button
+        class="primary new-chat-btn"
+        type="button"
+        title="新建对话"
+        aria-label="新建对话"
+        @click="createConversation"
+      >
+        <span class="new-chat-icon" aria-hidden="true">+</span>
+        <span class="new-chat-label">新建对话</span>
       </button>
 
       <div class="conv-list">
@@ -542,6 +549,14 @@ const handleLoginSuccess = async () => {
                 图生图
               </button>
             </div>
+            <label class="model-field toolbar-model">
+              <span>模型</span>
+              <select v-model="selectedModel" class="model-select" aria-label="生图模型">
+                <option v-for="modelName in modelOptions" :key="modelName" :value="modelName">
+                  {{ modelName }}
+                </option>
+              </select>
+            </label>
           </div>
           <p class="hint">
             <span class="hint-icon">●</span>
@@ -612,14 +627,6 @@ const handleLoginSuccess = async () => {
             @paste="onPromptPaste"
             rows="1"
           />
-          <label class="model-field">
-            <span>模型</span>
-            <select v-model="selectedModel" class="model-select" aria-label="生图模型">
-              <option v-for="modelName in modelOptions" :key="modelName" :value="modelName">
-                {{ modelName }}
-              </option>
-            </select>
-          </label>
           <button
             class="send-btn"
             type="button"
@@ -1197,7 +1204,7 @@ const handleLoginSuccess = async () => {
   --danger-soft: #ffb4a9;
   background: var(--canvas);
   color: var(--ink);
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 224px minmax(0, 1fr);
   letter-spacing: 0;
 }
 
@@ -1208,7 +1215,7 @@ const handleLoginSuccess = async () => {
   backdrop-filter: none;
 }
 
-.side-top { padding: 22px 18px 18px; }
+.side-top { padding: 16px 16px 12px; }
 .brand-lockup { display: flex; align-items: center; gap: 11px; }
 .brand-mark,
 .empty-mark {
@@ -1244,10 +1251,10 @@ const handleLoginSuccess = async () => {
 }
 
 .new-chat-btn {
-  width: calc(100% - 36px);
-  min-height: 40px;
-  margin: 0 18px 22px;
-  padding: 9px 12px;
+  width: calc(100% - 32px);
+  min-height: 36px;
+  margin: 0 16px 12px;
+  padding: 7px 10px;
   border: 1px solid #bbeb70;
   border-radius: 6px;
   background: var(--signal);
@@ -1264,18 +1271,18 @@ const handleLoginSuccess = async () => {
   transform: translateY(-1px);
 }
 .new-chat-btn:active:not(:disabled) { transform: translateY(0); }
-.conv-list { padding: 0 10px 12px; }
+.conv-list { padding: 0 8px 8px; }
 .section-label {
-  padding: 0 8px 8px;
+  padding: 0 6px 6px;
   color: var(--quiet);
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
 }
 .conv-item {
-  min-height: 60px;
+  min-height: 48px;
   margin-bottom: 2px;
-  padding: 10px 28px 10px 12px;
+  padding: 7px 26px 7px 10px;
   border: 1px solid transparent;
   border-radius: 5px;
   color: var(--subtle);
@@ -1297,22 +1304,22 @@ const handleLoginSuccess = async () => {
   content: "";
 }
 .conv-title { font-size: 13px; font-weight: 600; padding: 0; }
-.conv-meta { margin-top: 5px; color: var(--quiet); font-size: 10px; }
+.conv-meta { margin-top: 2px; color: var(--quiet); font-size: 10px; }
 .del { top: 50%; right: 5px; padding: 3px 5px; transform: translateY(-50%); color: var(--quiet); }
 .del:hover { background: #352521; color: var(--danger-soft); }
 .empty { padding: 20px 8px; color: var(--quiet); }
 
 .main { z-index: 1; height: 100dvh; background: var(--canvas); }
 .bar {
-  min-height: 76px;
-  padding: 14px 28px;
+  min-height: 60px;
+  padding: 9px 22px;
   border-bottom: 1px solid var(--line);
   background: var(--canvas);
 }
 .glass-bar { background: var(--canvas); backdrop-filter: none; }
 .bar-title { display: block; }
 .title-kicker {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   color: var(--aqua);
   font-family: var(--font-mono);
   font-size: 10px;
@@ -1361,8 +1368,8 @@ const handleLoginSuccess = async () => {
   color: #ffd7d1;
 }
 
-.messages { padding: 32px clamp(24px, 5vw, 72px); }
-.center { padding: 72px 20px; }
+.messages { padding: 18px clamp(16px, 3vw, 48px); }
+.center { padding: 44px 16px; }
 .tip {
   display: grid;
   justify-items: center;
@@ -1371,22 +1378,22 @@ const handleLoginSuccess = async () => {
   font-size: 13px;
   line-height: 1.7;
 }
-.tip .empty-mark { margin-bottom: 18px; }
+.tip .empty-mark { margin-bottom: 12px; }
 .tip strong { margin-bottom: 4px; color: var(--ink); font-size: 17px; }
-.msg { margin-bottom: 20px; }
+.msg { margin-bottom: 12px; }
 .bubble {
   max-width: min(760px, 88%);
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-radius: 6px;
   box-shadow: none;
 }
 .bubble.user { background: #273023; border: 1px solid #455440; }
 .bubble.assistant { background: var(--surface); border: 1px solid var(--line); backdrop-filter: none; }
-.role-tag { margin-bottom: 7px; color: var(--aqua); font-size: 10px; letter-spacing: 0; }
+.role-tag { margin-bottom: 4px; color: var(--aqua); font-size: 10px; letter-spacing: 0; }
 .bubble.user .role-tag { color: var(--signal); }
 .content { color: var(--ink); font-size: 14px; line-height: 1.65; }
 .ref-thumb img { border-radius: 5px; border-color: var(--line-strong); }
-.imgs { gap: 10px; }
+.imgs { gap: 6px; }
 .img-card img { border-radius: 5px; border-color: var(--line); background: #0b0e0b; }
 .cost { color: var(--amber); font-family: var(--font-mono); font-size: 11px; }
 .loading-bubble { min-width: 70px; background: var(--surface); }
@@ -1394,14 +1401,22 @@ const handleLoginSuccess = async () => {
 
 .composer-area {
   gap: 9px;
-  padding: 12px 28px 18px;
+  padding: 8px 22px 10px;
   border-top: 1px solid var(--line);
   background: var(--rail);
 }
 .composer-toolbar,
 .edit-banner,
 .input-row { max-width: 920px; }
-.composer-toolbar { min-height: 36px; }
+.composer-toolbar {
+  min-height: 44px;
+  align-items: center;
+  gap: 20px;
+}
+.composer-mode {
+  align-items: center;
+  gap: 10px;
+}
 .mode-switch {
   padding: 3px;
   border: 1px solid var(--line);
@@ -1457,7 +1472,7 @@ const handleLoginSuccess = async () => {
 
 .input-row {
   gap: 10px;
-  min-height: 76px;
+  min-height: 64px;
   padding: 7px 8px 7px 10px;
   border: 1px solid var(--line-strong);
   border-radius: 7px;
@@ -1475,8 +1490,8 @@ const handleLoginSuccess = async () => {
 .attach-btn:hover { background: #2e3a2c; border-color: var(--signal); color: var(--signal); }
 .attach-icon { font-size: 20px; }
 .input-row textarea {
-  min-height: 52px;
-  padding: 9px 2px;
+  min-height: 42px;
+  padding: 6px 2px;
   border: 0;
   border-radius: 0;
   color: var(--ink);
@@ -1503,6 +1518,16 @@ const handleLoginSuccess = async () => {
   font-size: 11px;
 }
 .model-select:focus { border-color: var(--aqua); box-shadow: none; }
+.toolbar-model {
+  flex: 0 0 184px;
+  align-self: center;
+}
+.toolbar-model > span { display: none; }
+.toolbar-model .model-select {
+  width: 184px;
+  min-height: 36px;
+  font-size: 12px;
+}
 .send-btn {
   min-width: 108px;
   min-height: 48px;
@@ -1522,28 +1547,70 @@ const handleLoginSuccess = async () => {
 
 @media (max-width: 860px) {
   .shell { grid-template-columns: 1fr; height: auto; min-height: 100dvh; }
-  .sidebar { max-height: none; border-right: 0; border-bottom: 1px solid var(--line); }
-  .side-top { padding: 14px 16px 10px; }
-  .new-chat-btn { width: auto; margin: 0 16px 12px; }
-  .conv-list { display: flex; gap: 6px; overflow-x: auto; padding: 0 16px 12px; }
+  .sidebar {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 8px;
+    max-height: none;
+    padding: 6px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .side-top { display: none; }
+  .new-chat-btn {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    margin: 0;
+    padding: 0;
+    border-radius: 5px;
+  }
+  .new-chat-icon { font-size: 22px; line-height: 1; font-weight: 400; }
+  .new-chat-label { display: none; }
+  .conv-list {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    overflow-x: auto;
+    padding: 0;
+  }
   .section-label, .conv-meta, .del { display: none; }
-  .conv-item { flex: 0 0 150px; min-height: auto; margin: 0; padding: 9px 12px; }
-  .conv-item.active::before { top: auto; right: 12px; bottom: 0; left: 12px; width: auto; height: 2px; }
-  .main { height: auto; min-height: 0; }
-  .bar { min-height: 62px; padding: 10px 16px; }
+  .conv-item {
+    flex: 0 0 auto;
+    max-width: 148px;
+    min-height: 32px;
+    margin: 0;
+    padding: 6px 10px;
+  }
+  .conv-title { font-size: 12px; line-height: 1.2; }
+  .conv-item.active::before { top: auto; right: 10px; bottom: 0; left: 10px; width: auto; height: 2px; }
+  .main { height: auto; min-height: calc(100dvh - 49px); }
+  .bar { min-height: 54px; padding: 8px 14px; }
   .title { font-size: 17px; }
   .bar-actions { gap: 6px; }
   .user-name { display: none; }
-  .messages { min-height: 42dvh; padding: 20px 16px; }
-  .composer-area { padding: 10px 16px 14px; }
+  .messages { min-height: 42dvh; padding: 12px 14px; }
+  .composer-area { padding: 8px 12px 10px; }
   .composer-toolbar { gap: 8px; }
   .mode-switch { width: auto; }
-  .composer-mode { width: auto; }
+  .composer-mode {
+    width: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
   .hint { width: auto; }
   .input-row { gap: 8px; }
   .input-row textarea { min-width: calc(100% - 50px); order: 0; }
-  .model-field { flex: 1; order: 2; }
-  .model-select { width: 100%; }
+  .toolbar-model {
+    display: grid;
+    flex: 1 1 170px;
+    min-width: 0;
+    max-width: 240px;
+  }
+  .toolbar-model .model-select { width: 100%; }
   .send-btn { order: 3; min-width: 94px; min-height: 40px; }
 }
 
@@ -1553,6 +1620,15 @@ const handleLoginSuccess = async () => {
   .composer-toolbar { align-items: center; }
   .mode-option { min-width: 72px; }
   .edit-banner { align-items: center; }
+}
+
+@media (max-width: 360px) {
+  .composer-toolbar { align-items: stretch; }
+  .composer-mode { flex-wrap: wrap; }
+  .toolbar-model {
+    flex-basis: 100%;
+    max-width: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

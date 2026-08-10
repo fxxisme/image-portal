@@ -26,6 +26,13 @@ docker compose up -d --build
 
 浏览器：`http://localhost:8080`
 
+### 移动端 PWA
+
+- 生产构建会生成应用清单、Android/iOS 多尺寸图标和 Service Worker。
+- 手机浏览器打开后可使用浏览器菜单添加到主屏幕；支持安装提示的浏览器会显示应用内“安装”按钮。
+- 应用外壳与本站 `/media/` 下已浏览的生成图片会缓存，断网时仍可打开已缓存的页面与图片；生成、登录及其他 API 请求仍需网络。
+- 除 `localhost` 外，PWA 需要通过 HTTPS 访问。
+
 1. `/admin/login` 用 `ADMIN_PASSWORD` 登录  
 2. **上游连接** 填 Base URL、API Key、默认模型（`gpt-image-2` 或 `grok-imagine-image`）
 3. 创建用户秘钥  
