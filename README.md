@@ -116,8 +116,8 @@ uvicorn app.main:app --reload --port 8000
 | CRUD | `/api/conversations` | 会话 |
 | POST | `/v1/images/generations` | OpenAI 兼容文生图，`Bearer` 可直接使用分配的 API Key |
 | POST | `/v1/images/edits` | OpenAI 兼容图生图，`Bearer` 可直接使用分配的 API Key |
-| POST | `/api/videos/generations` | 创建视频生成任务 |
-| GET | `/api/videos/{request_id}` | 查询视频生成进度和结果 |
+| POST | `/v1/videos/generations` | 创建视频生成任务，`Bearer` 可直接使用分配的 API Key |
+| GET | `/v1/videos/{request_id}` | 查询视频生成进度和结果，使用同一认证 |
 | GET/DELETE | `/api/gallery` | 用户图库（本地或 WebDAV 持久化） |
 | GET | `/api/admin/images` | 管理员查看全部生成图片 |
 
@@ -125,6 +125,7 @@ uvicorn app.main:app --reload --port 8000
 
 - 创建秘钥时明文只返回一次。
 - 外部客户端可直接使用 `Authorization: Bearer <分配的 API Key>` 调用图片接口；请求体采用 `model`、`prompt`、`n`、`response_format`，图生图额外传 `images: [{"url": "..."}]`。
+- 图片接口返回完整可直接访问的图片 URL，例如 `https://images.example.com/media/12/abc.png`；本地存储文件按识别到的图片类型保留 `.png`、`.jpg`、`.webp` 等扩展名。反向代理场景可配置 `PUBLIC_BASE_URL` 固定外网域名。
 - 门户界面通过 `X-Conversation-Id` 关联本地会话；该请求头对外部 OpenAI 兼容客户端为可选。
 - 上游 API Key 回显脱敏；保存时留空表示不修改。
 - 生图可能较慢，默认超时 300s。

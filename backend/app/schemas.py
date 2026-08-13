@@ -217,7 +217,7 @@ class OpenAIImageResponse(BaseModel):
 # ---------- Video generation (not persisted) ----------
 class VideoGenerationRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=10000)
-    duration: int = Field(default=8, ge=1, le=120)
+    duration: Literal[6, 8, 10, 15] = 8
     aspect_ratio: str = Field(default="16:9", min_length=3, max_length=16)
     resolution: Literal["420p", "720p"] = "720p"
     image: str | None = Field(default=None, max_length=16_000_000)

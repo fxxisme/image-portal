@@ -19,6 +19,8 @@ class Settings(BaseSettings):
 
     # 用户生成图本地持久化目录（相对 cwd 或绝对路径）
     media_dir: str = "./media"
+    # 对外图片 URL 的固定站点地址；留空时按当前请求的域名和协议生成。
+    public_base_url: str = ""
 
     # 管理端单口令（仅此与 JWT 仍走环境变量）
     admin_password: str = "change-me-admin"

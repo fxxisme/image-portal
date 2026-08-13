@@ -278,7 +278,7 @@ async def persist_generated_images(
             )
             db.add(row)
             db.flush()
-            public_urls.append(image_content_url(row))
+            public_urls.append(row.public_url)
         except Exception:
             logger.exception("persist image failed api_key=%s src_prefix=%s", api_key_id, src[:80])
             # 不返回上游原始 URL，避免将 Cloudflare 等 HTML 错页作为图片展示。

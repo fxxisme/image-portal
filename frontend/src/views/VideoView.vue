@@ -1,7 +1,9 @@
 <script setup>
 import { computed, onBeforeUnmount, ref } from "vue";
 import { apiUrl, request } from "../api/http";
+import { useAuthStore } from "../stores/auth";
 
+const auth = useAuthStore();
 const prompt = ref("");
 const duration = ref(8);
 const aspectRatio = ref("16:9");
@@ -43,7 +45,7 @@ function videoContentUrl(id, download = false) {
   const params = new URLSearchParams();
   if (download) params.set("download", "true");
   const query = params.toString();
-  return apiUrl(`/api/videos/${encodeURIComponent(id)}/content${query ? `?${query}` : ""}`);
+  return apiUrl(`/v1/videos/${encodeURIComponent(id)}/content${query ? `?${query}` : ""}`);
 }
 
 function readImage(file) {
@@ -91,7 +93,8 @@ async function pollStatus() {
   if (!polling.value || !requestId.value) return;
   const pollingRequestId = requestId.value;
   try {
-    const data = await request(`/api/videos/${encodeURIComponent(pollingRequestId)}`, {
+    const data = await request(`/v1/videos/${encodeURIComponent(pollingRequestId)}`, {
+      token: auth.userToken,
     });
     if (!polling.value || requestId.value !== pollingRequestId) return;
     status.value = data.status || "";
@@ -127,8 +130,9 @@ async function generate() {
   resetResult();
   submitting.value = true;
   try {
-    const data = await request("/api/videos/generations", {
+    const data = await request("/v1/videos/generations", {
       method: "POST",
+      token: auth.userToken,
       body: {
         prompt: prompt.value.trim(),
         duration: Number(duration.value),
@@ -170,7 +174,12 @@ onBeforeUnmount(stopPolling);
         <div class="video-options">
           <div class="field">
             <label>时长（秒）</label>
-            <input v-model.number="duration" :disabled="polling" type="number" min="1" max="120" />
+            <select v-model.number="duration" :disabled="polling">
+              <option :value="6">6 秒</option>
+              <option :value="8">8 秒</option>
+              <option :value="10">10 秒</option>
+              <option :value="15">15 秒</option>
+            </select>
           </div>
           <div class="field">
             <label>画面比例</label>
