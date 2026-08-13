@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { request } from "../api/http";
 import LoginModal from "../components/LoginModal.vue";
@@ -43,6 +43,7 @@ const error = ref("");
 const editImageUrls = ref([]);
 const fileInput = ref(null);
 const scroller = ref(null);
+const previewImage = ref(null);
 const generationMode = ref(
   savedPreferences.mode === "image-to-image" ? "image-to-image" : "text-to-image",
 );
@@ -290,6 +291,18 @@ function retryImage(event) {
   }, 800);
 }
 
+function openImagePreview(url, alt) {
+  previewImage.value = { url, alt };
+}
+
+function closeImagePreview() {
+  previewImage.value = null;
+}
+
+function onKeydown(event) {
+  if (event.key === "Escape" && previewImage.value) closeImagePreview();
+}
+
 async function send() {
   const text = prompt.value.trim();
   if (!text || sending.value) return;
@@ -391,6 +404,7 @@ function logout() {
 }
 
 onMounted(async () => {
+  window.addEventListener("keydown", onKeydown);
   await ensureMe();
   restoreBrowserConversations();
   if (!conversations.value.length) {
@@ -399,6 +413,8 @@ onMounted(async () => {
   await nextTick();
   scrollBottom();
 });
+
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 
 const showLoginModal = ref(false);
 
@@ -502,11 +518,23 @@ const handleLoginSuccess = async () => {
               <img :src="m.ref_image_url" alt="参考图" />
             </div>
 
-            <div v-if="m.image_urls?.length" class="imgs">
-              <div v-for="(url, idx) in m.image_urls" :key="idx" class="img-card">
-                <a :href="url" target="_blank" rel="noopener">
-                  <img :src="url" :alt="'image-' + idx" loading="lazy" @error="retryImage" />
-                </a>
+            <div v-if="m.image_urls?.length" class="imgs" :class="{ 'multiple-images': m.image_urls.length > 1 }">
+              <div v-for="(url, idx) in m.image_urls" :key="url" class="img-card">
+                <button
+                  class="image-preview-trigger"
+                  type="button"
+                  :title="`预览图片 ${idx + 1}`"
+                  @click="openImagePreview(url, `生成图片 ${idx + 1}`)"
+                >
+                  <img :src="url" :alt="`生成图片 ${idx + 1}`" loading="lazy" @error="retryImage" />
+                </button>
+                <div class="image-tools">
+                  <span>{{ idx + 1 }} / {{ m.image_urls.length }}</span>
+                  <div>
+                    <a :href="url" target="_blank" rel="noopener">原图</a>
+                    <a :href="url" :download="`generated-image-${idx + 1}`">下载</a>
+                  </div>
+                </div>
               </div>
             </div>
             <div v-if="m.cost" class="cost muted">消耗 {{ m.cost }} 张</div>
@@ -519,6 +547,15 @@ const handleLoginSuccess = async () => {
             <span class="dot" />
             <span class="dot" />
           </div>
+        </div>
+      </div>
+
+      <div v-if="previewImage" class="image-preview-modal" role="dialog" aria-modal="true" :aria-label="previewImage.alt" @click.self="closeImagePreview">
+        <button class="image-preview-close" type="button" title="关闭预览" aria-label="关闭预览" @click="closeImagePreview">&times;</button>
+        <img :src="previewImage.url" :alt="previewImage.alt" @error="retryImage" />
+        <div class="image-preview-actions">
+          <a :href="previewImage.url" target="_blank" rel="noopener">打开原图</a>
+          <a :href="previewImage.url" download="generated-image">下载</a>
         </div>
       </div>
 
@@ -855,14 +892,90 @@ const handleLoginSuccess = async () => {
   display: grid;
   gap: 14px;
 }
+.imgs.multiple-images {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.img-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: #0b0e0b;
+}
+.image-preview-trigger {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
 .img-card img {
   width: 100%;
+  aspect-ratio: 1 / 1;
   max-height: 56vh;
   object-fit: contain;
-  border-radius: 0.75rem;
-  border: 1px solid var(--border-light);
   background: #060e20;
   display: block;
+}
+.imgs:not(.multiple-images) .img-card img { aspect-ratio: auto; }
+.image-tools {
+  min-height: 32px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.image-tools div { display: flex; gap: 10px; }
+.image-tools a { color: inherit; text-decoration: none; }
+.image-tools a:hover { color: var(--aqua); }
+.image-preview-modal {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(0, 0, 0, 0.82);
+}
+.image-preview-modal > img {
+  max-width: min(1200px, 92vw);
+  max-height: 82vh;
+  object-fit: contain;
+  background: #000;
+}
+.image-preview-close {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.image-preview-actions {
+  position: absolute;
+  bottom: 18px;
+  display: flex;
+  gap: 12px;
+}
+.image-preview-actions a {
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--ink);
+  background: var(--surface);
+  text-decoration: none;
+  font-size: 13px;
 }
 .cost {
   margin-top: 8px;
@@ -1616,6 +1729,9 @@ const handleLoginSuccess = async () => {
   .composer-toolbar { align-items: center; }
   .mode-option { min-width: 72px; }
   .edit-banner { align-items: center; }
+  .imgs.multiple-images { grid-template-columns: 1fr; }
+  .image-preview-modal { padding: 14px; }
+  .image-preview-modal > img { max-width: 100%; max-height: 78vh; }
 }
 
 @media (max-width: 360px) {
