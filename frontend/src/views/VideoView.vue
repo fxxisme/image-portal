@@ -1,9 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref } from "vue";
 import { apiUrl, request } from "../api/http";
-import { useAuthStore } from "../stores/auth";
 
-const auth = useAuthStore();
 const prompt = ref("");
 const duration = ref(8);
 const aspectRatio = ref("16:9");
@@ -47,9 +45,7 @@ function resetResult() {
 }
 
 async function loadVideoContent(id) {
-  const response = await fetch(apiUrl(`/v1/videos/${encodeURIComponent(id)}/content`), {
-    headers: { Authorization: `Bearer ${auth.userToken}` },
-  });
+  const response = await fetch(apiUrl(`/v1/videos/${encodeURIComponent(id)}/content`));
   if (!response.ok) throw new Error("视频内容服务暂时不可用，请稍后重试");
   return URL.createObjectURL(await response.blob());
 }
@@ -100,7 +96,6 @@ async function pollStatus() {
   const pollingRequestId = requestId.value;
   try {
     const data = await request(`/v1/videos/${encodeURIComponent(pollingRequestId)}`, {
-      token: auth.userToken,
     });
     if (!polling.value || requestId.value !== pollingRequestId) return;
     status.value = data.status || "";
@@ -139,7 +134,6 @@ async function generate() {
   try {
     const data = await request("/v1/videos/generations", {
       method: "POST",
-      token: auth.userToken,
       body: {
         prompt: prompt.value.trim(),
         duration: Number(duration.value),

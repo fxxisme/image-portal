@@ -4,9 +4,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.auth import get_current_api_key_or_raw_key
 from app.database import get_db
-from app.models import ApiKey
 from app.schemas import (
     VideoGenerationRequest,
     VideoGenerationResponse,
@@ -26,7 +24,6 @@ settings = get_settings()
 @router.post("/generations", response_model=VideoGenerationResponse)
 async def generate_video(
     body: VideoGenerationRequest,
-    api_key: ApiKey = Depends(get_current_api_key_or_raw_key),
     db: Session = Depends(get_db),
 ) -> VideoGenerationResponse:
     try:
@@ -39,7 +36,6 @@ async def generate_video(
 @router.get("/{request_id}", response_model=VideoStatusResponse)
 async def get_video_status(
     request_id: str,
-    api_key: ApiKey = Depends(get_current_api_key_or_raw_key),
     db: Session = Depends(get_db),
 ) -> VideoStatusResponse:
     try:
@@ -59,7 +55,6 @@ async def get_video_content(
     request_id: str,
     request: Request,
     download: bool = False,
-    api_key: ApiKey = Depends(get_current_api_key_or_raw_key),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     try:
