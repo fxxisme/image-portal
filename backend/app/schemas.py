@@ -193,6 +193,27 @@ class GenerateResponse(BaseModel):
     quota_remaining: int
 
 
+# ---------- OpenAI-compatible images API ----------
+class OpenAIImageGenerationRequest(BaseModel):
+    prompt: str = Field(min_length=1)
+    model: str | None = None
+    n: int = Field(default=1, ge=1, le=4)
+    response_format: Literal["url", "b64_json"] | None = None
+
+
+class OpenAIImageEditRequest(OpenAIImageGenerationRequest):
+    images: list[EditImage] = Field(min_length=1, max_length=4)
+
+
+class OpenAIImageData(BaseModel):
+    url: str
+
+
+class OpenAIImageResponse(BaseModel):
+    created: int
+    data: list[OpenAIImageData]
+
+
 # ---------- Video generation (not persisted) ----------
 class VideoGenerationRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=10000)

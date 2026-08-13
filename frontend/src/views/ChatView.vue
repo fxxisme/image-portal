@@ -334,42 +334,38 @@ async function send() {
     if (currentId.value === localConversationId) scrollBottom();
 
     const bodyBase = {
-      conversation_id: backendConversationId,
       prompt: text,
       n: 1,
       model: requestModel,
+      response_format: "url",
     };
+    const headers = { "X-Conversation-Id": String(backendConversationId) };
     let data;
     if (refImages.length) {
-      data = await request("/api/edit", {
+      data = await request("/v1/images/edits", {
         method: "POST",
         token: auth.userToken,
+        headers,
         body: { ...bodyBase, images: refImages.map((url) => ({ url })) },
       });
     } else {
-      data = await request("/api/generate", {
+      data = await request("/v1/images/generations", {
         method: "POST",
         token: auth.userToken,
+        headers,
         body: bodyBase,
       });
     }
-
-    const idx = localMessages.findIndex((m) => m.id === optimisticUserMsg.id);
-    if (idx !== -1) {
-      localMessages.splice(idx, 1, {
-        ...data.user_message,
-        id: `${apiKeyId}-${data.user_message.id}`,
-      });
-    } else {
-      localMessages.push({ ...data.user_message, id: `${apiKeyId}-${data.user_message.id}` });
-    }
     localMessages.push({
-      ...data.assistant_message,
-      id: `${apiKeyId}-${data.assistant_message.id}`,
+      id: `${apiKeyId}-image-${Date.now()}`,
+      role: "assistant",
+      content: `已${refImages.length ? "编辑生成" : "生成"} ${data.data?.length || 0} 张图片`,
+      image_urls: (data.data || []).map((item) => item.url).filter(Boolean),
+      cost: data.data?.length || 0,
+      model: requestModel,
     });
     persistConversation(localConversationId, localMessages);
-    auth.setQuotaRemaining(data.quota_remaining);
-    if (auth.me) auth.me.quota_used = (auth.me.quota_total || 0) - data.quota_remaining;
+    await auth.fetchMe();
     await nextTick();
     if (currentId.value === localConversationId) scrollBottom();
   } catch (e) {

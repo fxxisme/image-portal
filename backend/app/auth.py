@@ -60,6 +60,17 @@ def get_current_api_key(
     return get_current_api_key_for_token(token, db)
 
 
+def get_current_api_key_or_raw_key(
+    token: str = Depends(get_bearer),
+    db: Session = Depends(get_db),
+) -> ApiKey:
+    """图片兼容 API 同时支持门户 JWT 与分配给用户的原始 API Key。"""
+    api_key = find_api_key_by_raw(db, token)
+    if api_key:
+        return api_key
+    return get_current_api_key_for_token(token, db)
+
+
 def get_current_api_key_for_token(token: str, db: Session) -> ApiKey:
     payload = decode_token(token)
     if payload.get("role") != "user":

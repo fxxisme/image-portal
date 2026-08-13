@@ -4,19 +4,23 @@ import logging
 import re
 from urllib.parse import parse_qs, urlparse
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_api_key
+from app.auth import get_current_api_key_or_raw_key
 from app.database import get_db
 from app.models import ApiKey, Conversation, GeneratedImage, Message, UsageLog
-from app.schemas import EditRequest, GenerateRequest, GenerateResponse
+from app.schemas import (
+    OpenAIImageEditRequest,
+    OpenAIImageGenerationRequest,
+    OpenAIImageResponse,
+)
 from app.services.media import (
     has_valid_image_signature,
     load_generated_image_bytes,
     persist_generated_images,
 )
-from app.services.messages import dump_urls, message_to_out
+from app.services.messages import dump_urls
 from app.services.settings import (
     get_image_to_image_models,
     get_or_create_settings,
@@ -24,7 +28,7 @@ from app.services.settings import (
 )
 from app.services.upstream import UpstreamError, images_edits, images_generations
 
-router = APIRouter(prefix="/api", tags=["images"])
+router = APIRouter(prefix="/v1/images", tags=["images"])
 logger = logging.getLogger(__name__)
 _GALLERY_CONTENT_PATH_RE = re.compile(r"^/api/gallery/(\d+)/content$")
 
@@ -37,6 +41,20 @@ def _get_owned_conversation(db: Session, api_key: ApiKey, conversation_id: int) 
     )
     if not item:
         raise HTTPException(status_code=404, detail="会话不存在")
+    return item
+
+
+def _get_or_create_conversation(
+    db: Session,
+    api_key: ApiKey,
+    conversation_id: int | None,
+    prompt: str,
+) -> Conversation:
+    if conversation_id is not None:
+        return _get_owned_conversation(db, api_key, conversation_id)
+    item = Conversation(api_key_id=api_key.id, title=prompt.strip()[:40] or "新对话")
+    db.add(item)
+    db.flush()
     return item
 
 
@@ -109,13 +127,14 @@ def _resolve_edit_image(db: Session, api_key: ApiKey, image_url: str) -> str:
     return f"data:{media_type};base64,{base64.b64encode(raw).decode()}"
 
 
-@router.post("/generate", response_model=GenerateResponse)
+@router.post("/generations", response_model=OpenAIImageResponse)
 async def generate(
-    body: GenerateRequest,
-    api_key: ApiKey = Depends(get_current_api_key),
+    body: OpenAIImageGenerationRequest,
+    conversation_id: int | None = Header(default=None, alias="X-Conversation-Id"),
+    api_key: ApiKey = Depends(get_current_api_key_or_raw_key),
     db: Session = Depends(get_db),
-) -> GenerateResponse:
-    conv = _get_owned_conversation(db, api_key, body.conversation_id)
+) -> OpenAIImageResponse:
+    conv = _get_or_create_conversation(db, api_key, conversation_id, body.prompt)
     _ensure_quota(api_key, body.n)
 
     sys = get_or_create_settings(db)
@@ -138,7 +157,13 @@ async def generate(
     db.flush()
 
     try:
-        urls = await images_generations(db, prompt=body.prompt, model=model, n=body.n)
+        urls = await images_generations(
+            db,
+            prompt=body.prompt,
+            model=model,
+            n=body.n,
+            response_format=body.response_format,
+        )
     except UpstreamError as exc:
         logger.warning("image generation upstream error: %s body=%r", exc, exc.body)
         db.add(
@@ -200,21 +225,20 @@ async def generate(
     db.refresh(assistant)
     db.refresh(api_key)
 
-    return GenerateResponse(
-        conversation_id=conv.id,
-        user_message=message_to_out(user_msg),
-        assistant_message=message_to_out(assistant),
-        quota_remaining=api_key.quota_remaining,
+    return OpenAIImageResponse(
+        created=int(assistant.created_at.timestamp()),
+        data=[{"url": url} for url in stored],
     )
 
 
-@router.post("/edit", response_model=GenerateResponse)
+@router.post("/edits", response_model=OpenAIImageResponse)
 async def edit(
-    body: EditRequest,
-    api_key: ApiKey = Depends(get_current_api_key),
+    body: OpenAIImageEditRequest,
+    conversation_id: int | None = Header(default=None, alias="X-Conversation-Id"),
+    api_key: ApiKey = Depends(get_current_api_key_or_raw_key),
     db: Session = Depends(get_db),
-) -> GenerateResponse:
-    conv = _get_owned_conversation(db, api_key, body.conversation_id)
+) -> OpenAIImageResponse:
+    conv = _get_or_create_conversation(db, api_key, conversation_id, body.prompt)
     _ensure_quota(api_key, body.n)
 
     sys = get_or_create_settings(db)
@@ -245,6 +269,7 @@ async def edit(
             image_urls=resolved_image_urls,
             model=model,
             n=body.n,
+            response_format=body.response_format,
         )
     except UpstreamError as exc:
         logger.warning("image edit upstream error: %s body=%r", exc, exc.body)
@@ -308,9 +333,7 @@ async def edit(
     db.refresh(assistant)
     db.refresh(api_key)
 
-    return GenerateResponse(
-        conversation_id=conv.id,
-        user_message=message_to_out(user_msg),
-        assistant_message=message_to_out(assistant),
-        quota_remaining=api_key.quota_remaining,
+    return OpenAIImageResponse(
+        created=int(assistant.created_at.timestamp()),
+        data=[{"url": url} for url in stored],
     )

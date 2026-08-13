@@ -22,9 +22,10 @@ function conciseError(message, status) {
   return raw || `HTTP ${status}`;
 }
 
-export async function request(path, { method = "GET", token, body, signal } = {}) {
+export async function request(path, { method = "GET", token, body, signal, headers: extraHeaders } = {}) {
   const headers = {
     ...authHeader(token),
+    ...extraHeaders,
   };
   const init = { method, headers, signal };
   if (body !== undefined) {

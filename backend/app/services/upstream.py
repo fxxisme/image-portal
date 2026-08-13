@@ -347,19 +347,23 @@ def _extract_urls(res: httpx.Response) -> list[str]:
             body=detail,
         )
 
-    items = (data or {}).get("data") or []
-    if not items:
-        raise UpstreamError("上游成功但未返回 data 图片", body=data)
-
     urls: list[str] = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        if item.get("url"):
-            urls.append(item["url"])
-        elif item.get("b64_json"):
-            urls.append(f"data:image/png;base64,{item['b64_json']}")
+
+    if isinstance(data, dict):
+        items = data.get("data") or []
+        for item in items if isinstance(items, list) else []:
+            if not isinstance(item, dict):
+                continue
+            if isinstance(item.get("url"), str) and item["url"].strip():
+                urls.append(item["url"].strip())
+            elif isinstance(item.get("b64_json"), str) and item["b64_json"].strip():
+                urls.append(f"data:image/png;base64,{item['b64_json']}")
+
+        # 部分兼容接口直接在响应顶层返回 urls，而非 OpenAI 的 data 数组。
+        top_level_urls = data.get("urls") or []
+        if isinstance(top_level_urls, list):
+            urls.extend(url.strip() for url in top_level_urls if isinstance(url, str) and url.strip())
 
     if not urls:
-        raise UpstreamError("上游 data 中无 url/b64_json", body=data)
-    return urls
+        raise UpstreamError("上游响应中无图片 URL", body=data)
+    return list(dict.fromkeys(urls))
