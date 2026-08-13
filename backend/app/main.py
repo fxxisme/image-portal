@@ -46,7 +46,8 @@ app.add_middleware(
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("X-Frame-Options", "DENY")
+    # 该站点需要被外部页面 iframe 嵌入，使用 CSP 显式允许嵌入。
+    response.headers.setdefault("Content-Security-Policy", "frame-ancestors *")
     response.headers.setdefault("Referrer-Policy", "same-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     return response
