@@ -2,9 +2,9 @@ import base64
 from datetime import datetime, timezone
 import logging
 import re
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, urlparse
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_api_key_or_raw_key
@@ -27,7 +27,6 @@ from app.services.settings import (
     get_text_to_image_models,
 )
 from app.services.upstream import UpstreamError, images_edits, images_generations
-from app.config import get_settings
 
 router = APIRouter(prefix="/v1/images", tags=["images"])
 logger = logging.getLogger(__name__)
@@ -65,14 +64,6 @@ def _ensure_quota(api_key: ApiKey, n: int) -> None:
             status_code=402,
             detail=f"额度不足：剩余 {api_key.quota_remaining} 张，本次需要 {n} 张",
         )
-
-
-def _absolute_public_url(request: Request, url: str) -> str:
-    """将本站相对媒体路径转为外部客户端可直接访问的绝对 URL。"""
-    if urlparse(url).scheme:
-        return url
-    base_url = get_settings().public_base_url.strip() or str(request.base_url)
-    return urljoin(base_url.rstrip("/") + "/", url.lstrip("/"))
 
 
 def _touch(conv: Conversation) -> None:
@@ -115,7 +106,6 @@ def _resolve_edit_image(db: Session, api_key: ApiKey, image_url: str) -> str:
 @router.post("/generations", response_model=OpenAIImageResponse)
 async def generate(
     body: OpenAIImageGenerationRequest,
-    request: Request,
     conversation_id: int | None = Header(default=None, alias="X-Conversation-Id"),
     api_key: ApiKey = Depends(get_current_api_key_or_raw_key),
     db: Session = Depends(get_db),
@@ -213,14 +203,13 @@ async def generate(
 
     return OpenAIImageResponse(
         created=int(assistant.created_at.timestamp()),
-        data=[{"url": _absolute_public_url(request, url)} for url in stored],
+        data=[{"url": url} for url in urls],
     )
 
 
 @router.post("/edits", response_model=OpenAIImageResponse)
 async def edit(
     body: OpenAIImageEditRequest,
-    request: Request,
     conversation_id: int | None = Header(default=None, alias="X-Conversation-Id"),
     api_key: ApiKey = Depends(get_current_api_key_or_raw_key),
     db: Session = Depends(get_db),
@@ -322,5 +311,5 @@ async def edit(
 
     return OpenAIImageResponse(
         created=int(assistant.created_at.timestamp()),
-        data=[{"url": _absolute_public_url(request, url)} for url in stored],
+        data=[{"url": url} for url in urls],
     )
