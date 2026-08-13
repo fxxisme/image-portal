@@ -32,7 +32,7 @@ async def generate_video(
     try:
         request_id = await videos_generations(db, **body.model_dump())
     except UpstreamError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail="视频服务暂时不可用，请稍后重试") from exc
     return VideoGenerationResponse(request_id=request_id)
 
 
@@ -45,7 +45,7 @@ async def get_video_status(
     try:
         data = await videos_retrieve(db, request_id=request_id)
     except UpstreamError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail="视频服务暂时不可用，请稍后重试") from exc
     return VideoStatusResponse(
         status=str(data.get("status") or ""),
         model=data.get("model"),
@@ -59,12 +59,13 @@ async def get_video_content(
     request_id: str,
     request: Request,
     download: bool = False,
+    api_key: ApiKey = Depends(get_current_api_key_or_raw_key),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     try:
         endpoint, headers = video_content_request(db, request_id=request_id)
     except UpstreamError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail="视频服务暂时不可用，请稍后重试") from exc
 
     range_header = request.headers.get("range")
     if range_header:
@@ -78,13 +79,13 @@ async def get_video_content(
         raise HTTPException(status_code=504, detail="视频内容请求超时") from exc
     except httpx.HTTPError as exc:
         await client.aclose()
-        raise HTTPException(status_code=502, detail=f"视频内容请求失败: {exc}") from exc
+        raise HTTPException(status_code=502, detail="视频内容服务暂时不可用，请稍后重试") from exc
 
     if upstream.status_code >= 400:
-        body = (await upstream.aread()).decode("utf-8", errors="replace")
+        await upstream.aread()
         await upstream.aclose()
         await client.aclose()
-        raise HTTPException(status_code=502, detail=f"视频上游返回 HTTP {upstream.status_code}: {body[:500]}")
+        raise HTTPException(status_code=502, detail="视频内容服务暂时不可用，请稍后重试")
 
     response_headers = {
         name: upstream.headers[name]

@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,7 +24,13 @@ if settings.database_url.startswith("sqlite:///"):
     else:
         Path(raw).parent.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title=settings.app_name, version="1.0.0")
+app = FastAPI(
+    title=settings.app_name,
+    version="1.0.0",
+    docs_url="/docs" if settings.enable_docs else None,
+    redoc_url="/redoc" if settings.enable_docs else None,
+    openapi_url="/openapi.json" if settings.enable_docs else None,
+)
 
 origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
@@ -34,6 +40,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    return response
 
 app.include_router(auth.router)
 app.include_router(admin.router)
@@ -90,6 +106,8 @@ def _mount_frontend() -> None:
         if (
             full_path == "api"
             or full_path.startswith("api/")
+            or full_path == "v1"
+            or full_path.startswith("v1/")
             or full_path == "media"
             or full_path.startswith("media/")
             or full_path in {

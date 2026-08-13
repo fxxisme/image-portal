@@ -113,7 +113,7 @@ async def list_upstream_models(
     try:
         models = await fetch_upstream_models(db)
     except UpstreamError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail="上游模型服务暂时不可用，请稍后重试") from exc
     return UpstreamModelsOut(models=models)
 
 

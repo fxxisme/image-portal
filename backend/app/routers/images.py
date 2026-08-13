@@ -84,33 +84,9 @@ def _maybe_title(conv: Conversation, prompt: str) -> None:
         conv.title = prompt.strip()[:40]
 
 
-def _upstream_error_detail(exc: UpstreamError) -> str:
-    message = _upstream_error_message(exc.body)
-    if exc.status_code and message:
-        return f"上游服务错误（HTTP {exc.status_code}）：{message}"
-    if exc.status_code:
-        return f"上游服务错误（HTTP {exc.status_code}）"
-    return str(exc)
-
-
-def _upstream_error_message(body: object) -> str:
-    """提取上游返回的简短错误文本，避免将完整响应直接展示给用户。"""
-    if isinstance(body, str):
-        message = body
-    elif isinstance(body, dict):
-        error = body.get("error")
-        if isinstance(error, dict):
-            message = error.get("message") or error.get("detail") or ""
-        elif isinstance(error, str):
-            message = error
-        else:
-            message = body.get("message") or body.get("detail") or ""
-    else:
-        message = ""
-
-    if not isinstance(message, str):
-        return ""
-    return " ".join(message.split())[:500]
+def _upstream_error_detail(_: UpstreamError) -> str:
+    """不向 API 调用方暴露供应商响应、网络地址或内部配置。"""
+    return "上游服务暂时不可用，请稍后重试"
 
 
 def _resolve_edit_image(db: Session, api_key: ApiKey, image_url: str) -> str:
@@ -175,7 +151,7 @@ async def generate(
             response_format=body.response_format,
         )
     except UpstreamError as exc:
-        logger.warning("image generation upstream error: %s body=%r", exc, exc.body)
+        logger.warning("image generation upstream error status=%s", exc.status_code)
         db.add(
             UsageLog(
                 api_key_id=api_key.id,
@@ -283,7 +259,7 @@ async def edit(
             response_format=body.response_format,
         )
     except UpstreamError as exc:
-        logger.warning("image edit upstream error: %s body=%r", exc, exc.body)
+        logger.warning("image edit upstream error status=%s", exc.status_code)
         db.add(
             UsageLog(
                 api_key_id=api_key.id,

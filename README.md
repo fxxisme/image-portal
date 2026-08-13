@@ -127,5 +127,6 @@ uvicorn app.main:app --reload --port 8000
 - 外部客户端可直接使用 `Authorization: Bearer <分配的 API Key>` 调用图片接口；请求体采用 `model`、`prompt`、`n`、`response_format`，图生图额外传 `images: [{"url": "..."}]`。
 - 图片接口返回完整可直接访问的图片 URL，例如 `https://images.example.com/media/12/abc.png`；本地存储文件按识别到的图片类型保留 `.png`、`.jpg`、`.webp` 等扩展名。反向代理场景可配置 `PUBLIC_BASE_URL` 固定外网域名。
 - 门户界面通过 `X-Conversation-Id` 关联本地会话；该请求头对外部 OpenAI 兼容客户端为可选。
+- 对外部署默认关闭 `/docs`、`/redoc` 和 `/openapi.json`；仅本地调试时设置 `ENABLE_DOCS=true`。
 - 上游 API Key 回显脱敏；保存时留空表示不修改。
 - 生图可能较慢，默认超时 300s。

@@ -35,6 +35,8 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: str = "*"
+    # 对外部署默认关闭接口文档，避免暴露内部管理接口与请求模型。
+    enable_docs: bool = False
 
 
 @lru_cache

@@ -20,6 +20,10 @@ const polling = ref(false);
 let pollTimer = null;
 let pollStartedAt = 0;
 
+function revokeVideoUrls() {
+  if (video.value?.url?.startsWith("blob:")) URL.revokeObjectURL(video.value.url);
+}
+
 const canSubmit = computed(() => !!prompt.value.trim() && !submitting.value && !polling.value);
 const progressLabel = computed(() => {
   if (progress.value == null) return "正在创建任务";
@@ -34,6 +38,7 @@ function stopPolling() {
 
 function resetResult() {
   stopPolling();
+  revokeVideoUrls();
   error.value = "";
   requestId.value = "";
   progress.value = null;
@@ -41,11 +46,12 @@ function resetResult() {
   video.value = null;
 }
 
-function videoContentUrl(id, download = false) {
-  const params = new URLSearchParams();
-  if (download) params.set("download", "true");
-  const query = params.toString();
-  return apiUrl(`/v1/videos/${encodeURIComponent(id)}/content${query ? `?${query}` : ""}`);
+async function loadVideoContent(id) {
+  const response = await fetch(apiUrl(`/v1/videos/${encodeURIComponent(id)}/content`), {
+    headers: { Authorization: `Bearer ${auth.userToken}` },
+  });
+  if (!response.ok) throw new Error("视频内容服务暂时不可用，请稍后重试");
+  return URL.createObjectURL(await response.blob());
 }
 
 function readImage(file) {
@@ -100,10 +106,11 @@ async function pollStatus() {
     status.value = data.status || "";
     progress.value = data.progress;
     if (data.status === "done" && Number(data.progress) === 100 && data.video?.url) {
+      const url = await loadVideoContent(pollingRequestId);
       video.value = {
         ...data.video,
-        url: videoContentUrl(pollingRequestId),
-        downloadUrl: videoContentUrl(pollingRequestId, true),
+        url,
+        downloadUrl: url,
       };
       stopPolling();
       return;
@@ -153,7 +160,10 @@ async function generate() {
   }
 }
 
-onBeforeUnmount(stopPolling);
+onBeforeUnmount(() => {
+  stopPolling();
+  revokeVideoUrls();
+});
 </script>
 
 <template>
