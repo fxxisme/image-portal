@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { apiUrl, request } from "../api/http";
@@ -195,18 +195,6 @@ async function fetchUpstreamModels() {
 
 function openPreview(image) {
   previewImage.value = image;
-}
-
-function showPromptModal(prompt: string | null) {
-  if (!prompt) return;
-  showPrompt.value = prompt;
-}
-
-function copyPrompt() {
-  if (!showPrompt.value) return;
-  navigator.clipboard.writeText(showPrompt.value).then(() => {
-    alert('提示词已复制');
-  });
 }
 
 async function downloadPreview() {

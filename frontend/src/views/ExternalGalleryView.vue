@@ -2,19 +2,11 @@
 import { computed, onMounted, ref } from "vue";
 import { apiUrl, request } from "../api/http";
 
-const showPrompt = ref<string | null>(null);
-
-function showPromptModal(prompt: string | null) {
-  if (!prompt) return;
-  showPrompt.value = prompt;
-}
-
-function copyPrompt() {
-  if (!showPrompt.value) return;
-  navigator.clipboard.writeText(showPrompt.value).then(() => {
-    alert('提示词已复制');
-  });
-}
+const loading = ref(false);
+const error = ref("");
+const items = ref([]);
+const nextCursor = ref(null);
+const selected = ref(null);
 
 const groups = computed(() => {
   const byDate = new Map();
@@ -54,18 +46,7 @@ function closeImage() {
   selected.value = null;
 }
 
-// 在 <script setup> 最后加上下面这部分
-function showPromptModal(prompt: string | null) {
-  if (!prompt) return;
-  showPrompt.value = prompt;
-}
-
-function copyPrompt() {
-  if (!showPrompt.value) return;
-  navigator.clipboard.writeText(showPrompt.value).then(() => {
-    alert('提示词已复制');
-  });
-}
+onMounted(loadGallery);
 </script>
 
 <template>
@@ -98,15 +79,7 @@ function copyPrompt() {
           @click="openImage(item)"
         >
           <img :src="imageUrl(item)" :alt="item.name" loading="lazy" />
-// 在 template 里面找到 image-tile 的结尾，添加提示词按钮
-<!-- 在 image-tile 里面新增这行 -->
-<button
-  class="prompt-btn"
-  type="button"
-  @click.stop="showPromptModal(item.prompt)"
->
-  提示词
-</button>
+          <span>{{ item.name }}</span>
         </button>
       </div>
     </section>
@@ -117,17 +90,11 @@ function copyPrompt() {
       </button>
     </div>
 
-<!-- 在 template 里面新增下面这部分 -->
-<div v-if="showPrompt" class="prompt-modal">
-  <div class="prompt-modal-content">
-    <h3>提示词</h3>
-    <pre>{{ showPrompt }}</pre>
-    <div class="prompt-actions">
-      <button @click="copyPrompt">复制提示词</button>
-      <button @click="showPrompt = null">关闭</button>
+    <div v-if="selected" class="preview-layer" role="dialog" aria-modal="true" :aria-label="selected.name" @click.self="closeImage">
+      <button class="preview-close" type="button" aria-label="关闭预览" @click="closeImage">×</button>
+      <img :src="imageUrl(selected)" :alt="selected.name" />
+      <p>{{ selected.path }}</p>
     </div>
-  </div>
-</div>
   </main>
 </template>
 
@@ -150,70 +117,6 @@ function copyPrompt() {
 .preview-layer img { min-width: 0; min-height: 0; width: 100%; height: 100%; object-fit: contain; }
 .preview-layer p { max-width: 100%; margin: 0; overflow: hidden; color: var(--muted); font-family: var(--font-mono); font-size: 12px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .preview-close { position: absolute; top: 14px; right: 16px; width: 36px; height: 36px; padding: 0; border: 1px solid var(--border-light); border-radius: 5px; background: var(--card); color: var(--text); font-size: 26px; line-height: 1; }
-<!-- 在 <style scoped> 最后加上下面这部分 -->
-.prompt-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.88);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.prompt-modal-content {
-  background: var(--bg);
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  padding: 24px;
-  max-width: 640px;
-  width: 90%;
-  max-height: 80vh;
-  overflow: auto;
-}
-
-.prompt-modal-content h3 {
-  margin-top: 0;
-  font-size: 18px;
-  margin-bottom: 16px;
-}
-
-.prompt-modal-content pre {
-  background: #111;
-  padding: 16px;
-  border-radius: 6px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-size: 14px;
-  line-height: 1.6;
-  margin-bottom: 20px;
-  max-height: 320px;
-  overflow: auto;
-}
-
-.prompt-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.prompt-actions button {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: 1px solid var(--border-light);
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.prompt-actions button:first-child {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-}
-
-.prompt-actions button:hover {
-  background: var(--hover);
-}
+.preview-close:hover { background: var(--bg-2); transform: none; }
 @media (max-width: 640px) { .external-gallery-page { padding: 18px; } .image-grid { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; } .preview-layer { padding: 18px; } }
 </style>
