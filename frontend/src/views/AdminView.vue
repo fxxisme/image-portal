@@ -23,8 +23,19 @@ const loadingImages = ref(false);
 const availableModels = ref([]);
 const loadingModels = ref(false);
 const activeTab = ref("settings");
-const previewImage = ref(null);
-const downloadingImage = ref(false);
+const showPrompt = ref<string | null>(null);
+
+function showPromptModal(prompt: string | null) {
+  if (!prompt) return;
+  showPrompt.value = prompt;
+}
+
+function copyPrompt() {
+  if (!showPrompt.value) return;
+  navigator.clipboard.writeText(showPrompt.value).then(() => {
+    alert('提示词已复制');
+  });
+}
 
 const form = ref({ name: "", quota_total: 20, api_key: "" });
 const settingsForm = ref({
@@ -186,8 +197,16 @@ function openPreview(image) {
   previewImage.value = image;
 }
 
-function closePreview() {
-  if (!downloadingImage.value) previewImage.value = null;
+function showPromptModal(prompt: string | null) {
+  if (!prompt) return;
+  showPrompt.value = prompt;
+}
+
+function copyPrompt() {
+  if (!showPrompt.value) return;
+  navigator.clipboard.writeText(showPrompt.value).then(() => {
+    alert('提示词已复制');
+  });
 }
 
 async function downloadPreview() {
@@ -643,8 +662,15 @@ onMounted(load);
             <span>#{{ image.api_key_id }} · {{ image.api_key_name }}</span>
             <span>{{ image.action === 'edit' ? '改图' : '生成' }}</span>
           </div>
-          <div class="image-prompt">{{ image.prompt || '无提示词' }}</div>
-          <time>{{ formatChinaDateTime(image.created_at) }}</time>
+// 在 template 里面找到 image-item 的结尾，添加提示词按钮
+<!-- 在 image-item 里面新增这行 -->
+<button
+  class="prompt-btn"
+  type="button"
+  @click.stop="showPromptModal(image.prompt)"
+>
+  提示词
+</button>
         </button>
       </div>
       <div v-else class="muted gallery-empty">{{ loadingImages ? "图片加载中…" : "暂无生成图片" }}</div>
@@ -655,21 +681,16 @@ onMounted(load);
       </div>
     </section>
 
-    <div v-if="previewImage" class="preview-backdrop" role="presentation" @click.self="closePreview">
-      <section class="preview-dialog" role="dialog" aria-modal="true" aria-label="图片预览">
-        <div class="preview-bar">
-          <div class="preview-title">图片预览</div>
-          <div class="preview-actions">
-            <button class="primary" type="button" :disabled="downloadingImage" @click="downloadPreview">
-              {{ downloadingImage ? "下载中…" : "下载原图" }}
-            </button>
-            <button class="ghost preview-close" type="button" aria-label="关闭预览" @click="closePreview">×</button>
-          </div>
-        </div>
-        <img :src="previewImage.public_url" :alt="previewImage.prompt || '生成图片'" />
-        <p v-if="previewImage.prompt" class="preview-prompt">{{ previewImage.prompt }}</p>
-      </section>
+<div v-if="showPrompt" class="prompt-modal">
+  <div class="prompt-modal-content">
+    <h3>提示词</h3>
+    <pre>{{ showPrompt }}</pre>
+    <div class="prompt-actions">
+      <button @click="copyPrompt">复制提示词</button>
+      <button @click="showPrompt = null">关闭</button>
     </div>
+  </div>
+</div>
 
     <!-- 新建秘钥 -->
     <section v-if="activeTab === 'settings'" class="glass-panel section-card">
@@ -1104,7 +1125,70 @@ h2 {
   .settings-wide { grid-column: auto; }
   .gallery-heading { flex-direction: column; }
   .gallery-tools { width: 100%; }
-  .preview-backdrop { padding: 12px; }
+  .prompt-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.prompt-modal-content {
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 640px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.prompt-modal-content h3 {
+  margin-top: 0;
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+
+.prompt-modal-content pre {
+  background: #111;
+  padding: 16px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.prompt-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.prompt-actions button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.prompt-actions button:first-child {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.prompt-actions button:hover {
+  background: var(--hover);
+}
   .preview-dialog { max-height: calc(100vh - 24px); }
 }
 </style>
