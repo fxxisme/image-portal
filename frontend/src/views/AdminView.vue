@@ -20,6 +20,8 @@ const copiedKey = ref(false);
 const images = ref([]);
 const imagesTotal = ref(0);
 const loadingImages = ref(false);
+const previewImage = ref(null);
+const downloadingImage = ref(false);
 const availableModels = ref([]);
 const loadingModels = ref(false);
 const activeTab = ref("settings");
@@ -638,28 +640,20 @@ onMounted(load);
         </div>
       </div>
       <div v-if="images.length" class="image-grid">
-        <button
+        <article
           v-for="image in images"
           :key="image.id"
-          type="button"
           class="image-item"
-          @click="openPreview(image)"
         >
-          <img :src="image.public_url" :alt="image.prompt || '生成图片'" loading="lazy" />
-          <div class="image-meta">
-            <span>#{{ image.api_key_id }} · {{ image.api_key_name }}</span>
-            <span>{{ image.action === 'edit' ? '改图' : '生成' }}</span>
-          </div>
-// 在 template 里面找到 image-item 的结尾，添加提示词按钮
-<!-- 在 image-item 里面新增这行 -->
-<button
-  class="prompt-btn"
-  type="button"
-  @click.stop="showPromptModal(image.prompt)"
->
-  提示词
-</button>
-        </button>
+          <button class="image-preview" type="button" :aria-label="'预览图片 #' + image.id" @click="openPreview(image)">
+            <img :src="image.public_url" :alt="image.prompt || '生成图片'" loading="lazy" />
+            <span class="image-meta">
+              <span>#{{ image.api_key_id }} · {{ image.api_key_name }}</span>
+              <span>{{ image.action === 'edit' ? '改图' : '生成' }}</span>
+            </span>
+          </button>
+          <button v-if="image.prompt" class="prompt-btn" type="button" @click="showPromptModal(image.prompt)">提示词</button>
+        </article>
       </div>
       <div v-else class="muted gallery-empty">{{ loadingImages ? "图片加载中…" : "暂无生成图片" }}</div>
       <div v-if="images.length < imagesTotal" class="gallery-more">
@@ -669,16 +663,35 @@ onMounted(load);
       </div>
     </section>
 
-<div v-if="showPrompt" class="prompt-modal">
-  <div class="prompt-modal-content">
-    <h3>提示词</h3>
-    <pre>{{ showPrompt }}</pre>
-    <div class="prompt-actions">
-      <button @click="copyPrompt">复制提示词</button>
-      <button @click="showPrompt = null">关闭</button>
+    <div v-if="showPrompt" class="prompt-modal" role="dialog" aria-modal="true" aria-labelledby="prompt-title" @click.self="showPrompt = null">
+      <section class="prompt-modal-content">
+        <header class="prompt-header">
+          <h3 id="prompt-title">提示词</h3>
+          <button class="preview-close" type="button" aria-label="关闭提示词" @click="showPrompt = null">×</button>
+        </header>
+        <pre>{{ showPrompt }}</pre>
+        <footer class="prompt-actions">
+          <button class="primary" type="button" @click="copyPrompt">复制</button>
+          <button class="ghost" type="button" @click="showPrompt = null">关闭</button>
+        </footer>
+      </section>
     </div>
-  </div>
-</div>
+
+    <div v-if="previewImage" class="preview-backdrop" role="dialog" aria-modal="true" aria-label="图片预览" @click.self="previewImage = null">
+      <section class="preview-dialog">
+        <header class="preview-bar">
+          <strong class="preview-title">图片预览</strong>
+          <div class="preview-actions">
+            <button class="ghost" type="button" :disabled="downloadingImage" @click="downloadPreview">
+              {{ downloadingImage ? "下载中…" : "下载" }}
+            </button>
+            <button class="ghost preview-close" type="button" aria-label="关闭预览" @click="previewImage = null">×</button>
+          </div>
+        </header>
+        <img :src="previewImage.public_url" :alt="previewImage.prompt || '生成图片'" />
+        <pre v-if="previewImage.prompt" class="preview-prompt">{{ previewImage.prompt }}</pre>
+      </section>
+    </div>
 
     <!-- 新建秘钥 -->
     <section v-if="activeTab === 'settings'" class="glass-panel section-card">
@@ -997,11 +1010,9 @@ h2 {
   gap: 12px;
 }
 .image-item {
+  position: relative;
   display: block;
-  padding: 0;
   text-align: left;
-  font-weight: 400;
-  font-family: var(--font-body);
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border-light);
@@ -1010,7 +1021,17 @@ h2 {
   color: var(--text);
 }
 .image-item:hover { border-color: var(--primary-2); color: var(--text); }
-.image-item:focus-visible {
+.image-preview {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.image-preview:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
@@ -1039,6 +1060,21 @@ h2 {
   font-size: 12px;
 }
 .image-item time { padding-bottom: 10px; margin-top: 5px; font-size: 10px; color: var(--muted-2); }
+.prompt-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 4px;
+  background: rgba(8, 10, 8, 0.78);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+}
+.prompt-btn:hover { background: var(--primary); }
+.prompt-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .gallery-empty { padding: 30px 0; text-align: center; }
 .gallery-more { display: flex; justify-content: center; margin-top: 16px; }
 .preview-backdrop {
@@ -1097,6 +1133,54 @@ h2 {
   line-height: 1.5;
   white-space: pre-wrap;
 }
+.prompt-modal {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 10, 8, 0.82);
+}
+.prompt-modal-content {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-2);
+  box-shadow: var(--shadow);
+}
+.prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+.prompt-header h3 { margin: 0; font-size: 14px; }
+.prompt-modal-content pre {
+  min-height: 0;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-light);
+}
 .status-pill {
   display: inline-block;
   padding: 2px 10px;
@@ -1113,70 +1197,6 @@ h2 {
   .settings-wide { grid-column: auto; }
   .gallery-heading { flex-direction: column; }
   .gallery-tools { width: 100%; }
-  .prompt-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.88);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.prompt-modal-content {
-  background: var(--bg);
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  padding: 24px;
-  max-width: 640px;
-  width: 90%;
-  max-height: 80vh;
-  overflow: auto;
-}
-
-.prompt-modal-content h3 {
-  margin-top: 0;
-  font-size: 18px;
-  margin-bottom: 16px;
-}
-
-.prompt-modal-content pre {
-  background: #111;
-  padding: 16px;
-  border-radius: 6px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-size: 14px;
-  line-height: 1.6;
-  margin-bottom: 20px;
-  max-height: 320px;
-  overflow: auto;
-}
-
-.prompt-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.prompt-actions button {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: 1px solid var(--border-light);
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.prompt-actions button:first-child {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-}
-
-.prompt-actions button:hover {
-  background: var(--hover);
-}
   .preview-dialog { max-height: calc(100vh - 24px); }
 }
 </style>
