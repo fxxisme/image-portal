@@ -42,6 +42,12 @@ const settingsForm = ref({
   webdav_password: "",
   webdav_path: "",
   webdav_public_base_url: "",
+  external_gallery_webdav_url: "",
+  external_gallery_webdav_username: "",
+  external_gallery_webdav_password: "",
+  external_gallery_webdav_path: "",
+  external_gallery_max_items: 2000,
+  external_gallery_max_depth: 16,
 });
 const settingsMeta = ref({
   has_upstream_api_key: false,
@@ -51,6 +57,8 @@ const settingsMeta = ref({
   webdav_password_masked: "",
   has_video_api_key: false,
   video_api_key_masked: "",
+  has_external_gallery_webdav_password: false,
+  external_gallery_webdav_password_masked: "",
 });
 
 function uniqueModels(...groups) {
@@ -127,6 +135,12 @@ async function load() {
       webdav_password: "",
       webdav_path: s.webdav_path || "",
       webdav_public_base_url: s.webdav_public_base_url || "",
+      external_gallery_webdav_url: s.external_gallery_webdav_url || "",
+      external_gallery_webdav_username: s.external_gallery_webdav_username || "",
+      external_gallery_webdav_password: "",
+      external_gallery_webdav_path: s.external_gallery_webdav_path || "",
+      external_gallery_max_items: s.external_gallery_max_items || 2000,
+      external_gallery_max_depth: s.external_gallery_max_depth || 16,
     };
     settingsMeta.value = {
       has_upstream_api_key: s.has_upstream_api_key,
@@ -136,6 +150,8 @@ async function load() {
       webdav_password_masked: s.webdav_password_masked || "",
       has_video_api_key: s.has_video_api_key,
       video_api_key_masked: s.video_api_key_masked || "",
+      has_external_gallery_webdav_password: s.has_external_gallery_webdav_password,
+      external_gallery_webdav_password_masked: s.external_gallery_webdav_password_masked || "",
     };
     if (activeTab.value === "images") await loadImages();
   } catch (e) {
@@ -236,6 +252,11 @@ async function saveSettings() {
       webdav_username: settingsForm.value.webdav_username.trim(),
       webdav_path: settingsForm.value.webdav_path.trim(),
       webdav_public_base_url: settingsForm.value.webdav_public_base_url.trim(),
+      external_gallery_webdav_url: settingsForm.value.external_gallery_webdav_url.trim(),
+      external_gallery_webdav_username: settingsForm.value.external_gallery_webdav_username.trim(),
+      external_gallery_webdav_path: settingsForm.value.external_gallery_webdav_path.trim(),
+      external_gallery_max_items: Number(settingsForm.value.external_gallery_max_items) || 2000,
+      external_gallery_max_depth: Number(settingsForm.value.external_gallery_max_depth) || 16,
     };
     const keyInput = settingsForm.value.upstream_api_key.trim();
     if (keyInput) body.upstream_api_key = keyInput;
@@ -243,6 +264,8 @@ async function saveSettings() {
     if (videoKeyInput) body.video_api_key = videoKeyInput;
     const webdavPassword = settingsForm.value.webdav_password.trim();
     if (webdavPassword) body.webdav_password = webdavPassword;
+    const externalGalleryPassword = settingsForm.value.external_gallery_webdav_password.trim();
+    if (externalGalleryPassword) body.external_gallery_webdav_password = externalGalleryPassword;
 
     const s = await request("/api/admin/settings", {
       method: "PUT",
@@ -252,6 +275,7 @@ async function saveSettings() {
     settingsForm.value.upstream_api_key = "";
     settingsForm.value.video_api_key = "";
     settingsForm.value.webdav_password = "";
+    settingsForm.value.external_gallery_webdav_password = "";
     settingsMeta.value = {
       has_upstream_api_key: s.has_upstream_api_key,
       upstream_api_key_masked: s.upstream_api_key_masked || "",
@@ -260,6 +284,8 @@ async function saveSettings() {
       webdav_password_masked: s.webdav_password_masked || "",
       has_video_api_key: s.has_video_api_key,
       video_api_key_masked: s.video_api_key_masked || "",
+      has_external_gallery_webdav_password: s.has_external_gallery_webdav_password,
+      external_gallery_webdav_password_masked: s.external_gallery_webdav_password_masked || "",
     };
     settingsForm.value.upstream_base_url = s.upstream_base_url || "";
     settingsForm.value.default_model = s.default_model || "gpt-image-2";
@@ -276,7 +302,12 @@ async function saveSettings() {
     settingsForm.value.webdav_username = s.webdav_username || "";
     settingsForm.value.webdav_path = s.webdav_path || "";
     settingsForm.value.webdav_public_base_url = s.webdav_public_base_url || "";
-    settingsMsg.value = "上游配置已保存";
+    settingsForm.value.external_gallery_webdav_url = s.external_gallery_webdav_url || "";
+    settingsForm.value.external_gallery_webdav_username = s.external_gallery_webdav_username || "";
+    settingsForm.value.external_gallery_webdav_path = s.external_gallery_webdav_path || "";
+    settingsForm.value.external_gallery_max_items = s.external_gallery_max_items || 2000;
+    settingsForm.value.external_gallery_max_depth = s.external_gallery_max_depth || 16;
+    settingsMsg.value = "系统配置已保存";
   } catch (e) {
     error.value = e.message || String(e);
   } finally {
@@ -549,9 +580,44 @@ onMounted(load);
           <input v-model="settingsForm.webdav_public_base_url" type="url" placeholder="https://cdn.example.com/image-portal（留空使用 WebDAV URL）" />
         </div>
       </div>
+
+      <h2 class="subsection-title">外部图库 WebDAV</h2>
+      <p class="muted tip">
+        仅用于 <span class="mono">/imgs</span> 的只读图片展示，与上方生成图存储完全独立。
+      </p>
+      <div class="settings-grid">
+        <div class="field">
+          <label>WebDAV URL</label>
+          <input v-model="settingsForm.external_gallery_webdav_url" type="url" placeholder="https://dav.example.com/remote.php/dav/files/user" />
+        </div>
+        <div class="field">
+          <label>WebDAV 用户名</label>
+          <input v-model="settingsForm.external_gallery_webdav_username" autocomplete="username" placeholder="用户名" />
+        </div>
+        <div class="field">
+          <label>
+            WebDAV 密码
+            <span v-if="settingsMeta.has_external_gallery_webdav_password" class="muted">（当前 {{ settingsMeta.external_gallery_webdav_password_masked }}）</span>
+            <span v-else class="muted">（未配置）</span>
+          </label>
+          <input v-model="settingsForm.external_gallery_webdav_password" type="password" autocomplete="new-password" placeholder="留空则不修改" />
+        </div>
+        <div class="field">
+          <label>起始目录</label>
+          <input v-model="settingsForm.external_gallery_webdav_path" placeholder="例如：photos" />
+        </div>
+        <div class="field">
+          <label>最大图片数</label>
+          <input v-model.number="settingsForm.external_gallery_max_items" type="number" min="1" max="10000" />
+        </div>
+        <div class="field">
+          <label>最大目录深度</label>
+          <input v-model.number="settingsForm.external_gallery_max_depth" type="number" min="1" max="32" />
+        </div>
+      </div>
       <div class="settings-foot">
         <button class="primary" type="button" :disabled="savingSettings" @click="saveSettings">
-          {{ savingSettings ? "保存中…" : "保存上游配置" }}
+          {{ savingSettings ? "保存中…" : "保存系统配置" }}
         </button>
         <span v-if="settingsMsg" class="ok">{{ settingsMsg }}</span>
         <span v-if="settingsMeta.updated_at" class="muted mono">

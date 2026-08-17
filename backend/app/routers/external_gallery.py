@@ -6,9 +6,11 @@ from urllib.parse import quote, unquote, urlparse
 from xml.etree import ElementTree
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.database import get_db
+from app.services.settings import get_or_create_settings
 
 router = APIRouter(prefix="/api/external-gallery", tags=["external-gallery"])
 logger = logging.getLogger(__name__)
@@ -17,8 +19,8 @@ _IMAGE_EXTENSIONS = {".avif", ".bmp", ".gif", ".heic", ".jpeg", ".jpg", ".png", 
 _DAV = "{DAV:}"
 
 
-def _settings_or_503():
-    settings = get_settings()
+def _settings_or_503(db: Session):
+    settings = get_or_create_settings(db)
     base_url = settings.external_gallery_webdav_url.strip().rstrip("/")
     parsed = urlparse(base_url)
     if not base_url or parsed.scheme not in {"http", "https"} or not parsed.netloc:
@@ -82,8 +84,8 @@ async def _list_directory(client: httpx.AsyncClient, base_url: str, path: str) -
 
 
 @router.get("/")
-async def list_external_gallery() -> dict:
-    settings, base_url = _settings_or_503()
+async def list_external_gallery(db: Session = Depends(get_db)) -> dict:
+    settings, base_url = _settings_or_503(db)
     root_path = _normalise_path(settings.external_gallery_webdav_path)
     max_items = max(1, min(settings.external_gallery_max_items, 10000))
     max_depth = max(1, min(settings.external_gallery_max_depth, 32))
@@ -142,8 +144,11 @@ async def list_external_gallery() -> dict:
 
 
 @router.get("/content")
-async def read_external_image(path: str = Query(min_length=1, max_length=2048)) -> Response:
-    settings, base_url = _settings_or_503()
+async def read_external_image(
+    path: str = Query(min_length=1, max_length=2048),
+    db: Session = Depends(get_db),
+) -> Response:
+    settings, base_url = _settings_or_503(db)
     relative_path = _normalise_path(path)
     if PurePosixPath(relative_path).suffix.lower() not in _IMAGE_EXTENSIONS:
         raise HTTPException(status_code=404, detail="图片不存在")

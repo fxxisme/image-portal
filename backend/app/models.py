@@ -124,6 +124,13 @@ class SystemSetting(Base):
     webdav_password: Mapped[str] = mapped_column(Text, nullable=False, default="")
     webdav_path: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     webdav_public_base_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    # 只读外部图库，独立于生成图 WebDAV 存储。
+    external_gallery_webdav_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    external_gallery_webdav_username: Mapped[str] = mapped_column(String(256), nullable=False, default="")
+    external_gallery_webdav_password: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    external_gallery_webdav_path: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    external_gallery_max_items: Mapped[int] = mapped_column(Integer, nullable=False, default=2000)
+    external_gallery_max_depth: Mapped[int] = mapped_column(Integer, nullable=False, default=16)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 

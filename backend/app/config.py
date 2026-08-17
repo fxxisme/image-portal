@@ -22,14 +22,6 @@ class Settings(BaseSettings):
     # 对外图片 URL 的固定站点地址；留空时按当前请求的域名和协议生成。
     public_base_url: str = ""
 
-    # 外部图库：独立于管理后台的生成图 WebDAV 存储配置。
-    external_gallery_webdav_url: str = ""
-    external_gallery_webdav_username: str = ""
-    external_gallery_webdav_password: str = ""
-    external_gallery_webdav_path: str = ""
-    external_gallery_max_items: int = 2000
-    external_gallery_max_depth: int = 16
-
     # 管理端单口令（仅此与 JWT 仍走环境变量）
     admin_password: str = "change-me-admin"
     jwt_secret: str = "change-me-jwt-secret-please"

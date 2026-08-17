@@ -55,6 +55,13 @@ def _settings_out(row) -> SystemSettingsOut:
         has_webdav_password=bool((row.webdav_password or "").strip()),
         webdav_path=row.webdav_path or "",
         webdav_public_base_url=row.webdav_public_base_url or "",
+        external_gallery_webdav_url=row.external_gallery_webdav_url or "",
+        external_gallery_webdav_username=row.external_gallery_webdav_username or "",
+        external_gallery_webdav_password_masked=mask_api_key(row.external_gallery_webdav_password or ""),
+        has_external_gallery_webdav_password=bool((row.external_gallery_webdav_password or "").strip()),
+        external_gallery_webdav_path=row.external_gallery_webdav_path or "",
+        external_gallery_max_items=row.external_gallery_max_items or 2000,
+        external_gallery_max_depth=row.external_gallery_max_depth or 16,
         updated_at=row.updated_at,
     )
 
@@ -101,6 +108,12 @@ def update_settings_api(
         webdav_password=body.webdav_password,
         webdav_path=body.webdav_path,
         webdav_public_base_url=body.webdav_public_base_url,
+        external_gallery_webdav_url=body.external_gallery_webdav_url,
+        external_gallery_webdav_username=body.external_gallery_webdav_username,
+        external_gallery_webdav_password=body.external_gallery_webdav_password,
+        external_gallery_webdav_path=body.external_gallery_webdav_path,
+        external_gallery_max_items=body.external_gallery_max_items,
+        external_gallery_max_depth=body.external_gallery_max_depth,
     )
     return _settings_out(row)
 

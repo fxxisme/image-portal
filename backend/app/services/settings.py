@@ -57,6 +57,12 @@ def get_or_create_settings(db: Session) -> SystemSetting:
             webdav_password="",
             webdav_path="",
             webdav_public_base_url="",
+            external_gallery_webdav_url="",
+            external_gallery_webdav_username="",
+            external_gallery_webdav_password="",
+            external_gallery_webdav_path="",
+            external_gallery_max_items=2000,
+            external_gallery_max_depth=16,
         )
         db.add(row)
         db.commit()
@@ -90,6 +96,12 @@ def apply_settings_update(
     webdav_password: str | None = None,
     webdav_path: str | None = None,
     webdav_public_base_url: str | None = None,
+    external_gallery_webdav_url: str | None = None,
+    external_gallery_webdav_username: str | None = None,
+    external_gallery_webdav_password: str | None = None,
+    external_gallery_webdav_path: str | None = None,
+    external_gallery_max_items: int | None = None,
+    external_gallery_max_depth: int | None = None,
 ) -> SystemSetting:
     row = get_or_create_settings(db)
     if upstream_base_url is not None:
@@ -125,6 +137,18 @@ def apply_settings_update(
         row.webdav_path = webdav_path.strip().strip("/")
     if webdav_public_base_url is not None:
         row.webdav_public_base_url = webdav_public_base_url.strip().rstrip("/")
+    if external_gallery_webdav_url is not None:
+        row.external_gallery_webdav_url = external_gallery_webdav_url.strip().rstrip("/")
+    if external_gallery_webdav_username is not None:
+        row.external_gallery_webdav_username = external_gallery_webdav_username.strip()
+    if external_gallery_webdav_password is not None and external_gallery_webdav_password.strip() != "":
+        row.external_gallery_webdav_password = external_gallery_webdav_password.strip()
+    if external_gallery_webdav_path is not None:
+        row.external_gallery_webdav_path = external_gallery_webdav_path.strip().strip("/")
+    if external_gallery_max_items is not None:
+        row.external_gallery_max_items = external_gallery_max_items
+    if external_gallery_max_depth is not None:
+        row.external_gallery_max_depth = external_gallery_max_depth
     row.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
