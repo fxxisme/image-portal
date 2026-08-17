@@ -46,8 +46,7 @@ const settingsForm = ref({
   external_gallery_webdav_username: "",
   external_gallery_webdav_password: "",
   external_gallery_webdav_path: "",
-  external_gallery_max_items: 2000,
-  external_gallery_max_depth: 16,
+  external_gallery_max_items: 60,
 });
 const settingsMeta = ref({
   has_upstream_api_key: false,
@@ -139,8 +138,7 @@ async function load() {
       external_gallery_webdav_username: s.external_gallery_webdav_username || "",
       external_gallery_webdav_password: "",
       external_gallery_webdav_path: s.external_gallery_webdav_path || "",
-      external_gallery_max_items: s.external_gallery_max_items || 2000,
-      external_gallery_max_depth: s.external_gallery_max_depth || 16,
+      external_gallery_max_items: s.external_gallery_max_items || 60,
     };
     settingsMeta.value = {
       has_upstream_api_key: s.has_upstream_api_key,
@@ -255,8 +253,7 @@ async function saveSettings() {
       external_gallery_webdav_url: settingsForm.value.external_gallery_webdav_url.trim(),
       external_gallery_webdav_username: settingsForm.value.external_gallery_webdav_username.trim(),
       external_gallery_webdav_path: settingsForm.value.external_gallery_webdav_path.trim(),
-      external_gallery_max_items: Number(settingsForm.value.external_gallery_max_items) || 2000,
-      external_gallery_max_depth: Number(settingsForm.value.external_gallery_max_depth) || 16,
+      external_gallery_max_items: Number(settingsForm.value.external_gallery_max_items) || 60,
     };
     const keyInput = settingsForm.value.upstream_api_key.trim();
     if (keyInput) body.upstream_api_key = keyInput;
@@ -305,8 +302,7 @@ async function saveSettings() {
     settingsForm.value.external_gallery_webdav_url = s.external_gallery_webdav_url || "";
     settingsForm.value.external_gallery_webdav_username = s.external_gallery_webdav_username || "";
     settingsForm.value.external_gallery_webdav_path = s.external_gallery_webdav_path || "";
-    settingsForm.value.external_gallery_max_items = s.external_gallery_max_items || 2000;
-    settingsForm.value.external_gallery_max_depth = s.external_gallery_max_depth || 16;
+    settingsForm.value.external_gallery_max_items = s.external_gallery_max_items || 60;
     settingsMsg.value = "系统配置已保存";
   } catch (e) {
     error.value = e.message || String(e);
@@ -607,12 +603,8 @@ onMounted(load);
           <input v-model="settingsForm.external_gallery_webdav_path" placeholder="例如：photos" />
         </div>
         <div class="field">
-          <label>最大图片数</label>
-          <input v-model.number="settingsForm.external_gallery_max_items" type="number" min="1" max="10000" />
-        </div>
-        <div class="field">
-          <label>最大目录深度</label>
-          <input v-model.number="settingsForm.external_gallery_max_depth" type="number" min="1" max="32" />
+          <label>每页图片数</label>
+          <input v-model.number="settingsForm.external_gallery_max_items" type="number" min="1" max="200" />
         </div>
       </div>
       <div class="settings-foot">

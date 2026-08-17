@@ -57,7 +57,6 @@ class SystemSettingsOut(BaseModel):
     has_external_gallery_webdav_password: bool
     external_gallery_webdav_path: str
     external_gallery_max_items: int
-    external_gallery_max_depth: int
     updated_at: datetime | None = None
 
 
@@ -84,8 +83,7 @@ class SystemSettingsUpdate(BaseModel):
     # 传空或不传 = 不修改现有密码
     external_gallery_webdav_password: str | None = None
     external_gallery_webdav_path: str | None = Field(default=None, max_length=512)
-    external_gallery_max_items: int | None = Field(default=None, ge=1, le=10000)
-    external_gallery_max_depth: int | None = Field(default=None, ge=1, le=32)
+    external_gallery_max_items: int | None = Field(default=None, ge=1, le=200)
 
 
 class UpstreamModelsOut(BaseModel):

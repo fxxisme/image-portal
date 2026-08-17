@@ -129,8 +129,7 @@ class SystemSetting(Base):
     external_gallery_webdav_username: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     external_gallery_webdav_password: Mapped[str] = mapped_column(Text, nullable=False, default="")
     external_gallery_webdav_path: Mapped[str] = mapped_column(String(512), nullable=False, default="")
-    external_gallery_max_items: Mapped[int] = mapped_column(Integer, nullable=False, default=2000)
-    external_gallery_max_depth: Mapped[int] = mapped_column(Integer, nullable=False, default=16)
+    external_gallery_max_items: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 

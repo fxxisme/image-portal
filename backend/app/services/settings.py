@@ -61,8 +61,7 @@ def get_or_create_settings(db: Session) -> SystemSetting:
             external_gallery_webdav_username="",
             external_gallery_webdav_password="",
             external_gallery_webdav_path="",
-            external_gallery_max_items=2000,
-            external_gallery_max_depth=16,
+            external_gallery_max_items=60,
         )
         db.add(row)
         db.commit()
@@ -101,7 +100,6 @@ def apply_settings_update(
     external_gallery_webdav_password: str | None = None,
     external_gallery_webdav_path: str | None = None,
     external_gallery_max_items: int | None = None,
-    external_gallery_max_depth: int | None = None,
 ) -> SystemSetting:
     row = get_or_create_settings(db)
     if upstream_base_url is not None:
@@ -147,8 +145,6 @@ def apply_settings_update(
         row.external_gallery_webdav_path = external_gallery_webdav_path.strip().strip("/")
     if external_gallery_max_items is not None:
         row.external_gallery_max_items = external_gallery_max_items
-    if external_gallery_max_depth is not None:
-        row.external_gallery_max_depth = external_gallery_max_depth
     row.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
