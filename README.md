@@ -40,6 +40,19 @@ docker compose up -d --build
 
 若要将生成图保存至 WebDAV，在管理后台的 **WebDAV 存储** 填写地址、账号、密码和远端目录。远端目录留空时，图片保存至 `image-portal/YYYY-MM-DD/`；填写时用该目录替代 `image-portal`。图片展示地址默认使用 WebDAV 地址；当 WebDAV 地址不适合浏览器直接访问时，填写映射到同一目录的 **公开访问基址**。
 
+### 外部图库
+
+`/imgs` 是独立的只读图库，不使用管理后台中的 WebDAV 存储设置。请在部署环境或 `.env` 配置以下变量后重启服务：
+
+```dotenv
+EXTERNAL_GALLERY_WEBDAV_URL=https://dav.example.com/remote.php/dav/files/user
+EXTERNAL_GALLERY_WEBDAV_USERNAME=user
+EXTERNAL_GALLERY_WEBDAV_PASSWORD=password
+EXTERNAL_GALLERY_WEBDAV_PATH=photos
+```
+
+服务端会递归读取 `EXTERNAL_GALLERY_WEBDAV_PATH` 及其子目录中的图片，并通过本站接口代理图片内容；WebDAV 地址和凭据不会下发到浏览器。`EXTERNAL_GALLERY_MAX_ITEMS`（默认 `2000`）与 `EXTERNAL_GALLERY_MAX_DEPTH`（默认 `16`）可限制扫描范围。
+
 镜像：多阶段构建前端 → 拷入 Python 镜像，由 FastAPI 托管静态 + `/api`。
 
 ## 环境变量
@@ -53,6 +66,10 @@ docker compose up -d --build
 | `DATABASE_URL` | 默认容器内 `sqlite:////data/portal.db` |
 | `STATIC_DIR` | 容器内静态目录，默认 `/app/static`（本地开发勿设） |
 | `MEDIA_DIR` | 生成图落盘目录；本地默认 `./media`，容器 `/data/media` |
+| `EXTERNAL_GALLERY_WEBDAV_URL` | 外部图库 WebDAV 根地址 |
+| `EXTERNAL_GALLERY_WEBDAV_USERNAME` / `EXTERNAL_GALLERY_WEBDAV_PASSWORD` | 外部图库 WebDAV 凭据，可留空 |
+| `EXTERNAL_GALLERY_WEBDAV_PATH` | 外部图库起始目录，相对 WebDAV 根地址 |
+| `EXTERNAL_GALLERY_MAX_ITEMS` / `EXTERNAL_GALLERY_MAX_DEPTH` | 外部图库扫描上限，默认 2000 / 16 |
 
 **不要**在 `.env` 写 `UPSTREAM_*` / `DEFAULT_MODEL`，改管理后台。
 
@@ -119,6 +136,7 @@ uvicorn app.main:app --reload --port 8000
 | POST | `/v1/videos/generations` | 创建视频生成任务，`Bearer` 可直接使用分配的 API Key |
 | GET | `/v1/videos/{request_id}` | 查询视频生成进度和结果，使用同一认证 |
 | GET/DELETE | `/api/gallery` | 用户图库（本地或 WebDAV 持久化） |
+| GET | `/api/external-gallery` | `/imgs` 使用的外部图库目录与图片代理接口 |
 | GET | `/api/admin/images` | 管理员查看全部生成图片 |
 
 ## 注意
