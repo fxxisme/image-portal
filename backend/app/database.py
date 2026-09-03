@@ -61,6 +61,9 @@ def _ensure_sqlite_columns() -> None:
             "video_base_url": "TEXT NOT NULL DEFAULT ''",
             "video_api_key": "TEXT NOT NULL DEFAULT ''",
             "video_model": "TEXT NOT NULL DEFAULT ''",
+            "moderation_base_url": "TEXT NOT NULL DEFAULT ''",
+            "moderation_api_key": "TEXT NOT NULL DEFAULT ''",
+            "moderation_model": "TEXT NOT NULL DEFAULT ''",
         },
         "generated_images": {
             "storage_backend": "TEXT NOT NULL DEFAULT 'local'",

@@ -51,6 +51,9 @@ def get_or_create_settings(db: Session) -> SystemSetting:
             video_base_url="",
             video_api_key="",
             video_model="",
+            moderation_base_url="",
+            moderation_api_key="",
+            moderation_model="",
             response_format="url",
             webdav_url="",
             webdav_username="",
@@ -89,6 +92,9 @@ def apply_settings_update(
     video_base_url: str | None = None,
     video_api_key: str | None = None,
     video_model: str | None = None,
+    moderation_base_url: str | None = None,
+    moderation_api_key: str | None = None,
+    moderation_model: str | None = None,
     response_format: str | None = None,
     webdav_url: str | None = None,
     webdav_username: str | None = None,
@@ -123,6 +129,12 @@ def apply_settings_update(
         row.video_api_key = video_api_key.strip()
     if video_model is not None:
         row.video_model = video_model.strip()
+    if moderation_base_url is not None:
+        row.moderation_base_url = moderation_base_url.strip()
+    if moderation_api_key is not None and moderation_api_key.strip() != "":
+        row.moderation_api_key = moderation_api_key.strip()
+    if moderation_model is not None:
+        row.moderation_model = moderation_model.strip()
     if response_format is not None:
         row.response_format = response_format.strip() or "url"
     if webdav_url is not None:

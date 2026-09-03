@@ -14,6 +14,7 @@
   - 创建/禁用秘钥、设置额度、用量记录
 - 上游：文生图模型统一使用 `/v1/images/generations`；图生图固定使用 `gpt-image-2` 的 `/v1/images/edits`；成功按张扣额度
 - 视频：独立配置上游 Base URL / API Key / 模型，调用 `/v1/videos/generations` 后轮询 `/v1/videos/{request_id}`；不写入对话、图库或本地存储
+- 内容审核：管理端独立配置审核 Base URL / API Key / 模型；对外提供 `/v1/moderations`，服务端转换为审核上游的 `/v1/completions`
 
 ## Docker（单容器）
 
@@ -120,6 +121,7 @@ uvicorn app.main:app --reload --port 8000
 | CRUD | `/api/conversations` | 会话 |
 | POST | `/v1/images/generations` | OpenAI 兼容文生图，`Bearer` 可直接使用分配的 API Key |
 | POST | `/v1/images/edits` | OpenAI 兼容图生图，`Bearer` 可直接使用分配的 API Key |
+| POST | `/v1/moderations` | OpenAI 兼容文本审核，转换为已配置上游的 `/v1/completions` |
 | POST | `/v1/videos/generations` | 创建视频生成任务，`Bearer` 可直接使用分配的 API Key |
 | GET | `/v1/videos/{request_id}` | 查询视频生成进度和结果，使用同一认证 |
 | GET/DELETE | `/api/gallery` | 用户图库（本地或 WebDAV 持久化） |
@@ -130,6 +132,7 @@ uvicorn app.main:app --reload --port 8000
 
 - 创建秘钥时明文只返回一次。
 - 外部客户端可直接使用 `Authorization: Bearer <分配的 API Key>` 调用图片接口；请求体采用 `model`、`prompt`、`n`、`response_format`，图生图额外传 `images: [{"url": "..."}]`。
+- 审核接口仅支持文本 `input`（字符串或字符串数组），配置页的审核模型决定实际调用的下游模型；不扣图片额度，但会记录 `moderation` 用量。纯 `/v1/completions` 上游不支持图片审核。
 - 图片接口返回完整可直接访问的图片 URL，例如 `https://images.example.com/media/12/abc.png`；本地存储文件按识别到的图片类型保留 `.png`、`.jpg`、`.webp` 等扩展名。反向代理场景可配置 `PUBLIC_BASE_URL` 固定外网域名。
 - 门户界面通过 `X-Conversation-Id` 关联本地会话；该请求头对外部 OpenAI 兼容客户端为可选。
 - 对外部署默认关闭 `/docs`、`/redoc` 和 `/openapi.json`；仅本地调试时设置 `ENABLE_DOCS=true`。

@@ -49,6 +49,9 @@ const settingsForm = ref({
   video_base_url: "",
   video_api_key: "",
   video_model: "",
+  moderation_base_url: "",
+  moderation_api_key: "",
+  moderation_model: "",
   response_format: "url",
   webdav_url: "",
   webdav_username: "",
@@ -69,6 +72,8 @@ const settingsMeta = ref({
   webdav_password_masked: "",
   has_video_api_key: false,
   video_api_key_masked: "",
+  has_moderation_api_key: false,
+  moderation_api_key_masked: "",
   has_external_gallery_webdav_password: false,
   external_gallery_webdav_password_masked: "",
 });
@@ -141,6 +146,9 @@ async function load() {
       video_base_url: s.video_base_url || "",
       video_api_key: "",
       video_model: s.video_model || "",
+      moderation_base_url: s.moderation_base_url || "",
+      moderation_api_key: "",
+      moderation_model: s.moderation_model || "",
       response_format: s.response_format || "url",
       webdav_url: s.webdav_url || "",
       webdav_username: s.webdav_username || "",
@@ -161,6 +169,8 @@ async function load() {
       webdav_password_masked: s.webdav_password_masked || "",
       has_video_api_key: s.has_video_api_key,
       video_api_key_masked: s.video_api_key_masked || "",
+      has_moderation_api_key: s.has_moderation_api_key,
+      moderation_api_key_masked: s.moderation_api_key_masked || "",
       has_external_gallery_webdav_password: s.has_external_gallery_webdav_password,
       external_gallery_webdav_password_masked: s.external_gallery_webdav_password_masked || "",
     };
@@ -254,6 +264,8 @@ async function saveSettings() {
       image_to_image_models: settingsForm.value.image_to_image_models,
       video_base_url: settingsForm.value.video_base_url.trim(),
       video_model: settingsForm.value.video_model.trim(),
+      moderation_base_url: settingsForm.value.moderation_base_url.trim(),
+      moderation_model: settingsForm.value.moderation_model.trim(),
       response_format: settingsForm.value.response_format || "url",
       webdav_url: settingsForm.value.webdav_url.trim(),
       webdav_username: settingsForm.value.webdav_username.trim(),
@@ -268,6 +280,8 @@ async function saveSettings() {
     if (keyInput) body.upstream_api_key = keyInput;
     const videoKeyInput = settingsForm.value.video_api_key.trim();
     if (videoKeyInput) body.video_api_key = videoKeyInput;
+    const moderationKeyInput = settingsForm.value.moderation_api_key.trim();
+    if (moderationKeyInput) body.moderation_api_key = moderationKeyInput;
     const webdavPassword = settingsForm.value.webdav_password.trim();
     if (webdavPassword) body.webdav_password = webdavPassword;
     const externalGalleryPassword = settingsForm.value.external_gallery_webdav_password.trim();
@@ -280,6 +294,7 @@ async function saveSettings() {
     });
     settingsForm.value.upstream_api_key = "";
     settingsForm.value.video_api_key = "";
+    settingsForm.value.moderation_api_key = "";
     settingsForm.value.webdav_password = "";
     settingsForm.value.external_gallery_webdav_password = "";
     settingsMeta.value = {
@@ -290,6 +305,8 @@ async function saveSettings() {
       webdav_password_masked: s.webdav_password_masked || "",
       has_video_api_key: s.has_video_api_key,
       video_api_key_masked: s.video_api_key_masked || "",
+      has_moderation_api_key: s.has_moderation_api_key,
+      moderation_api_key_masked: s.moderation_api_key_masked || "",
       has_external_gallery_webdav_password: s.has_external_gallery_webdav_password,
       external_gallery_webdav_password_masked: s.external_gallery_webdav_password_masked || "",
     };
@@ -303,6 +320,8 @@ async function saveSettings() {
       : ["gpt-image-2"];
     settingsForm.value.video_base_url = s.video_base_url || "";
     settingsForm.value.video_model = s.video_model || "";
+    settingsForm.value.moderation_base_url = s.moderation_base_url || "";
+    settingsForm.value.moderation_model = s.moderation_model || "";
     settingsForm.value.response_format = s.response_format || "url";
     settingsForm.value.webdav_url = s.webdav_url || "";
     settingsForm.value.webdav_username = s.webdav_username || "";
@@ -523,6 +542,29 @@ onMounted(load);
         <div class="field">
           <label>视频模型</label>
           <input v-model="settingsForm.video_model" placeholder="grok-imagine-video" />
+        </div>
+      </div>
+
+      <h2 class="subsection-title">内容审核</h2>
+      <p class="muted tip">
+        对外提供 <span class="mono">/v1/moderations</span>，服务端将文本审核转换为此上游的 <span class="mono">/v1/completions</span>。
+      </p>
+      <div class="settings-grid">
+        <div class="field">
+          <label>审核 Base URL</label>
+          <input v-model="settingsForm.moderation_base_url" type="url" placeholder="https://api.example.com" />
+        </div>
+        <div class="field">
+          <label>
+            审核 API Key
+            <span v-if="settingsMeta.has_moderation_api_key" class="muted">（当前 {{ settingsMeta.moderation_api_key_masked }}）</span>
+            <span v-else class="muted">（未配置）</span>
+          </label>
+          <input v-model="settingsForm.moderation_api_key" type="password" placeholder="留空则不修改" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>审核模型</label>
+          <input v-model="settingsForm.moderation_model" placeholder="下游 /v1/completions 模型名" />
         </div>
       </div>
 

@@ -44,6 +44,10 @@ class SystemSettingsOut(BaseModel):
     video_api_key_masked: str
     has_video_api_key: bool
     video_model: str
+    moderation_base_url: str
+    moderation_api_key_masked: str
+    has_moderation_api_key: bool
+    moderation_model: str
     response_format: str
     webdav_url: str
     webdav_username: str
@@ -71,6 +75,10 @@ class SystemSettingsUpdate(BaseModel):
     # 传空或不传 = 不修改现有 key
     video_api_key: str | None = None
     video_model: str | None = Field(default=None, max_length=128)
+    moderation_base_url: str | None = Field(default=None, max_length=512)
+    # 传空或不传 = 不修改现有 key
+    moderation_api_key: str | None = None
+    moderation_model: str | None = Field(default=None, max_length=128)
     response_format: str | None = Field(default=None, max_length=32)
     webdav_url: str | None = Field(default=None, max_length=512)
     webdav_username: str | None = Field(default=None, max_length=256)
@@ -224,6 +232,29 @@ class OpenAIImageData(BaseModel):
 class OpenAIImageResponse(BaseModel):
     created: int
     data: list[OpenAIImageData]
+
+
+# ---------- OpenAI-compatible moderations API ----------
+class OpenAIModerationRequest(BaseModel):
+    input: str | list[str]
+    model: str | None = Field(default=None, max_length=128)
+
+    @field_validator("input")
+    @classmethod
+    def validate_input(cls, value: str | list[str]) -> str | list[str]:
+        items = [value] if isinstance(value, str) else value
+        if not items:
+            raise ValueError("input 不能为空")
+        if len(items) > 32:
+            raise ValueError("input 最多包含 32 项")
+        if any(not item.strip() for item in items):
+            raise ValueError("input 不能包含空文本")
+        if any(len(item) > 50_000 for item in items):
+            raise ValueError("单项 input 不能超过 50000 个字符")
+        return value
+
+    def input_items(self) -> list[str]:
+        return [self.input] if isinstance(self.input, str) else self.input
 
 
 # ---------- Video generation (not persisted) ----------

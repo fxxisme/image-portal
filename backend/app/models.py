@@ -117,6 +117,10 @@ class SystemSetting(Base):
     video_base_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     video_api_key: Mapped[str] = mapped_column(Text, nullable=False, default="")
     video_model: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    # 内容审核通过下游 /v1/completions 转换，独立于图片和视频上游。
+    moderation_base_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    moderation_api_key: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    moderation_model: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     response_format: Mapped[str] = mapped_column(String(32), nullable=False, default="url")
     # 留空时继续使用本地 media；配置后生成结果上传至 WebDAV。
     webdav_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
