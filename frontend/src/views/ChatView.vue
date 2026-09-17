@@ -519,7 +519,7 @@ const handleLoginSuccess = async () => {
             </div>
 
             <div v-if="m.image_urls?.length" class="imgs" :class="{ 'multiple-images': m.image_urls.length > 1 }">
-              <div v-for="(url, idx) in m.image_urls" :key="url" class="img-card">
+              <div v-for="(url, idx) in m.image_urls" :key="url" class="img-card group">
                 <button
                   class="image-preview-trigger"
                   type="button"
@@ -527,12 +527,15 @@ const handleLoginSuccess = async () => {
                   @click="openImagePreview(url, `生成图片 ${idx + 1}`)"
                 >
                   <img :src="url" :alt="`生成图片 ${idx + 1}`" loading="lazy" @error="retryImage" />
+                  <div class="image-overlay-action">
+                    <span class="view-pill">点击全屏查看</span>
+                  </div>
                 </button>
                 <div class="image-tools">
-                  <span>{{ idx + 1 }} / {{ m.image_urls.length }}</span>
-                  <div>
-                    <a :href="url" target="_blank" rel="noopener">原图</a>
-                    <a :href="url" :download="`generated-image-${idx + 1}`">下载</a>
+                  <span class="index-chip">{{ idx + 1 }} / {{ m.image_urls.length }}</span>
+                  <div class="action-links">
+                    <a :href="url" target="_blank" rel="noopener">新窗口</a>
+                    <a :href="url" :download="`generated-image-${idx + 1}`" class="dl-badge">下载</a>
                   </div>
                 </div>
               </div>
@@ -542,10 +545,12 @@ const handleLoginSuccess = async () => {
         </div>
 
         <div v-if="sending" class="msg assistant">
-          <div class="bubble assistant loading-bubble">
-            <span class="dot" />
-            <span class="dot" />
-            <span class="dot" />
+          <div class="bubble assistant studio-generating-card">
+            <div class="generating-header">
+              <span class="pulsing-orbit"></span>
+              <span class="generating-title">AI 正在绘制画面...</span>
+            </div>
+            <div class="generating-skeleton shimmer"></div>
           </div>
         </div>
       </div>
@@ -704,18 +709,19 @@ const handleLoginSuccess = async () => {
   font-family: var(--font-display);
   font-size: 20px;
   font-weight: 700;
-  background: var(--prismatic);
+  background: var(--primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  letter-spacing: -0.02em;
 }
 
 .new-chat-btn {
   width: calc(100% - 32px);
   margin: 4px 16px 12px;
-  padding: 12px 0;
-  border-radius: 0.75rem;
-  font-size: 14px;
+  padding: 10px 0;
+  border-radius: 0.625rem;
+  font-size: 13.5px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -731,25 +737,28 @@ const handleLoginSuccess = async () => {
   width: 100%;
   text-align: left;
   background: transparent;
-  color: var(--text);
+  color: var(--text-soft);
   border: 1px solid transparent;
-  border-radius: 0.75rem;
-  padding: 10px 12px;
+  border-radius: 0.625rem;
+  padding: 10px 14px;
   position: relative;
   margin-bottom: 4px;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .conv-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
 }
 .conv-item.active {
-  border-color: rgba(173, 198, 255, 0.35);
-  border-right: 3px solid var(--secondary);
-  background: rgba(5, 102, 217, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+  border-left: 3px solid var(--primary);
+  border-right: 1px solid rgba(56, 189, 248, 0.2);
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.12) 0%, rgba(56, 189, 248, 0.02) 100%);
+  color: #fff;
 }
 .conv-title {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 500;
   padding-right: 20px;
   white-space: nowrap;
   overflow: hidden;
@@ -757,6 +766,7 @@ const handleLoginSuccess = async () => {
 }
 .conv-meta {
   font-size: 11px;
+  color: var(--muted-2);
   margin-top: 3px;
 }
 .del {
@@ -849,17 +859,20 @@ const handleLoginSuccess = async () => {
 
 .bubble {
   max-width: min(720px, 88%);
-  border-radius: 1rem;
-  padding: 14px 16px;
+  border-radius: 1.125rem;
+  padding: 14px 18px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 .bubble.user {
-  background: #273023;
-  border: 1px solid #455440;
+  background: linear-gradient(135deg, #1e293b 0%, #172033 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
 }
 .bubble.assistant {
-  background: rgba(19, 27, 46, 0.55);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(149, 142, 160, 0.15);
+  background: rgba(22, 29, 43, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .role-tag {
@@ -896,13 +909,21 @@ const handleLoginSuccess = async () => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .img-card {
+  position: relative;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  background: #0b0e0b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: #0f141f;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.img-card:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 14px 32px -4px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.12);
+  transform: translateY(-2px);
 }
 .image-preview-trigger {
+  position: relative;
   display: block;
   width: 100%;
   padding: 0;
@@ -910,29 +931,122 @@ const handleLoginSuccess = async () => {
   background: transparent;
   cursor: zoom-in;
 }
+.image-overlay-action {
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 17, 23, 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.image-preview-trigger:hover .image-overlay-action {
+  opacity: 1;
+}
+.view-pill {
+  padding: 6px 14px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transform: translateY(4px);
+  transition: transform 0.2s ease;
+}
+.image-preview-trigger:hover .view-pill {
+  transform: translateY(0);
+}
 .img-card img {
   width: 100%;
   aspect-ratio: 1 / 1;
   max-height: 56vh;
   object-fit: contain;
-  background: #060e20;
+  background: #070a10;
   display: block;
+  transition: transform 0.35s ease;
+}
+.img-card:hover img {
+  transform: scale(1.015);
 }
 .imgs:not(.multiple-images) .img-card img { aspect-ratio: auto; }
 .image-tools {
-  min-height: 32px;
-  padding: 0 8px;
+  min-height: 38px;
+  padding: 0 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: var(--muted-2);
+  color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
+  background: rgba(18, 24, 38, 0.85);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
-.image-tools div { display: flex; gap: 10px; }
-.image-tools a { color: inherit; text-decoration: none; }
-.image-tools a:hover { color: var(--aqua); }
+.index-chip {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+}
+.action-links { display: flex; gap: 10px; align-items: center; }
+.action-links a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.action-links a:hover { color: #fff; }
+.dl-badge {
+  color: var(--primary) !important;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+.dl-badge:hover {
+  background: rgba(56, 189, 248, 0.2);
+}
+
+/* Studio Generating Animation Card */
+.studio-generating-card {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px !important;
+}
+.generating-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pulsing-orbit {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 12px var(--primary);
+  animation: pulse-ring 1.8s infinite ease-in-out;
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.85); opacity: 0.6; }
+}
+.generating-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+.generating-skeleton {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
 .image-preview-modal {
   position: fixed;
   z-index: 20;
@@ -1010,26 +1124,29 @@ const handleLoginSuccess = async () => {
 .mode-switch {
   display: inline-flex;
   padding: 4px;
-  border: 1px solid rgba(149, 142, 160, 0.18);
-  border-radius: 0.75rem;
-  background: rgba(11, 19, 38, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.625rem;
+  background: rgba(18, 24, 38, 0.65);
+  backdrop-filter: blur(8px);
 }
 .mode-option {
-  min-width: 88px;
-  padding: 8px 14px;
+  min-width: 84px;
+  padding: 6px 14px;
   border: 0;
   border-radius: 0.5rem;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
   font-size: 13px;
-  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .mode-option:hover { color: var(--text); }
 .mode-option.active {
-  background: #344229;
-  color: var(--text);
-  box-shadow: inset 0 0 0 1px #4f6738;
+  background: rgba(56, 189, 248, 0.14);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
+  font-weight: 600;
 }
 .mode-option:focus-visible {
   outline: 2px solid var(--secondary);
@@ -1108,13 +1225,18 @@ const handleLoginSuccess = async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px;
+  padding: 8px 12px;
   border-radius: 1rem;
-  transition: box-shadow 0.2s, border-color 0.2s;
+  background: rgba(22, 29, 43, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .input-row:focus-within {
-  box-shadow: 0 0 0 2px rgba(145, 211, 203, 0.12);
-  border-color: var(--secondary);
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(56, 189, 248, 0.15);
 }
 
 .attach-btn {
@@ -1122,33 +1244,35 @@ const handleLoginSuccess = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 0.75rem;
-  background: transparent;
-  border: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 0.625rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--muted);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .attach-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
 }
 .attach-icon {
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
   font-weight: 300;
 }
 
 .input-row textarea {
   flex: 1;
-  min-height: 56px;
+  min-height: 52px;
   max-height: 160px;
   border: none;
   background: transparent;
-  padding: 10px 0;
-  font-size: 16px;
+  padding: 12px 6px;
+  font-size: 15px;
   line-height: 1.6;
   font-weight: 400;
   resize: none;
@@ -1158,8 +1282,11 @@ const handleLoginSuccess = async () => {
 .model-select {
   flex: 0 0 168px;
   width: 168px;
-  padding: 10px;
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: rgba(18, 24, 38, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
 }
 
 .send-btn {
@@ -1167,31 +1294,34 @@ const handleLoginSuccess = async () => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 12px 28px;
-  border-radius: 0.75rem;
-  background: var(--prismatic);
-  color: #23005c;
-  border: none;
+  padding: 10px 24px;
+  border-radius: 0.625rem;
+  background: var(--primary-gradient);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   cursor: pointer;
-  font-size: 15px;
+  font-size: 14.5px;
   font-family: var(--font-body);
   font-weight: 600;
-  box-shadow: none;
-  transition: all 0.2s;
+  box-shadow: 0 4px 14px var(--primary-glow);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .send-btn:hover:not(:disabled) {
-  transform: scale(1.02);
-  opacity: 0.93;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
+  filter: brightness(1.1);
 }
 .send-btn:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: translateY(0);
+  filter: brightness(0.95);
 }
 .send-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: not-allowed;
   box-shadow: none;
-  background: rgba(149, 142, 160, 0.18);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--muted-2);
+  border-color: transparent;
 }
 .bolt {
   font-size: 16px;

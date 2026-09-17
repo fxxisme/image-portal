@@ -112,8 +112,8 @@ onMounted(async () => {
   font-size: 11px;
   letter-spacing: 0.05em;
   color: var(--primary);
-  background: #273320;
-  border: 1px solid #4f6738;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.28);
   padding: 2px 8px;
   border-radius: 4px;
 }

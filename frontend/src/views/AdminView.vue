@@ -882,23 +882,28 @@ onMounted(load);
   position: relative;
   z-index: 1;
   display: inline-flex;
-  gap: 2px;
-  margin-bottom: 20px;
-  padding: 3px;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  background: var(--input);
+  gap: 4px;
+  margin-bottom: 24px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(18, 24, 38, 0.6);
+  backdrop-filter: blur(8px);
 }
 .admin-tabs button {
-  padding: 8px 14px;
-  border-radius: 5px;
+  padding: 8px 18px;
+  border-radius: 7px;
   background: transparent;
   color: var(--muted);
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .admin-tabs button:hover { color: var(--text); }
 .admin-tabs button.active {
-  background: #344229;
-  color: var(--text);
+  background: rgba(56, 189, 248, 0.12);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.3);
+  font-weight: 600;
 }
 h1 {
   margin: 0;
@@ -1225,9 +1230,20 @@ h2 {
 }
 .status-pill {
   display: inline-block;
-  padding: 2px 10px;
-  border-radius: 4px;
-  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.status-pill.ok {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.status-pill.err {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
 @media (max-width: 720px) {
