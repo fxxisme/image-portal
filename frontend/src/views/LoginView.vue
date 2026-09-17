@@ -99,33 +99,37 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .brand-text {
   font-family: var(--font-display);
   font-size: 24px;
   font-weight: 700;
   color: var(--text);
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 .badge-ver {
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.05em;
-  color: var(--primary);
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.28);
+  color: var(--secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 h1 {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   font-size: 22px;
   font-weight: 700;
   font-family: var(--font-display);
 }
 .sub {
-  margin: 0 0 24px;
+  margin: 0 0 28px;
   font-size: 14px;
   color: var(--muted);
   line-height: 1.5;
@@ -136,17 +140,17 @@ h1 {
 }
 .input-wrap input {
   background: var(--input);
-  border: 1px solid var(--border-light);
-  padding: 12px 14px;
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  border-radius: 8px;
+  font-size: 15px;
 }
 .input-wrap input:focus {
-  border-color: var(--secondary);
-  box-shadow: 0 0 0 3px rgba(145, 211, 203, 0.12);
+  border-color: var(--border-focus);
 }
 
 .foot {
-  margin: 18px 0 0;
+  margin: 20px 0 0;
   font-size: 13px;
   text-align: center;
 }
