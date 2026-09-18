@@ -330,7 +330,10 @@ async function send() {
       model: requestModel,
       response_format: "url",
     };
-    const headers = { "X-Conversation-Id": String(backendConversationId) };
+    const headers = {};
+    if (backendConversationId && !isNaN(Number(backendConversationId))) {
+      headers["X-Conversation-Id"] = String(backendConversationId);
+    }
     let data;
     if (refImages.length) {
       data = await request("/v1/images/edits", {
@@ -763,16 +766,17 @@ const handleLoginSuccess = async () => {
   position: relative;
   margin-bottom: 4px;
   min-height: 44px;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .conv-item:hover {
-  background: var(--bg-surface);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text);
 }
 .conv-item.active {
-  border-color: var(--border);
-  background: var(--bg-surface);
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.08) 0%, transparent 100%);
+  border-color: rgba(255, 255, 255, 0.05);
   color: var(--text);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 .conv-item.active::before {
   position: absolute;
@@ -780,7 +784,7 @@ const handleLoginSuccess = async () => {
   bottom: 10px;
   left: 0;
   width: 3px;
-  background: var(--primary);
+  background: var(--primary-gradient);
   content: "";
   border-radius: 0 4px 4px 0;
 }
@@ -1116,6 +1120,9 @@ const handleLoginSuccess = async () => {
   flex-direction: column;
   gap: 12px;
   padding: 16px !important;
+  box-shadow: 0 4px 20px rgba(167, 139, 250, 0.08);
+  border: 1px solid rgba(167, 139, 250, 0.15);
+  background: linear-gradient(145deg, var(--card) 0%, rgba(167, 139, 250, 0.03) 100%);
 }
 .generating-header {
   display: flex;
@@ -1176,6 +1183,27 @@ const handleLoginSuccess = async () => {
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-surface);
+  position: relative;
+  overflow: hidden;
+}
+.generating-skeleton::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-100%);
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
 }
 
 .cost {
@@ -1355,14 +1383,15 @@ const handleLoginSuccess = async () => {
   min-height: 64px;
   padding: 8px 10px 8px 12px;
   border: 1px solid var(--border-light);
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--input);
-  box-shadow: var(--shadow-sm);
-  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm), var(--shadow-inner);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .input-row:focus-within {
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 1px var(--border-focus);
+  border-color: rgba(167, 139, 250, 0.4);
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.4), var(--shadow-inner);
+  background: var(--bg-surface);
 }
 
 .attach-btn {
@@ -1374,12 +1403,16 @@ const handleLoginSuccess = async () => {
   color: var(--text-soft);
   background: var(--bg-surface);
   cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .attach-btn:hover {
   background: var(--card-hover);
   border-color: var(--border-light);
   color: var(--text);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
+.attach-btn:active { transform: translateY(0); box-shadow: none; }
 .attach-icon { font-size: 18px; }
 
 .hidden-file { display: none; }
@@ -1419,14 +1452,15 @@ const handleLoginSuccess = async () => {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .send-btn:hover:not(:disabled) {
   background: var(--text-soft);
   opacity: 1;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
 }
-.send-btn:active:not(:disabled) { transform: translateY(0); }
+.send-btn:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
 .send-btn:disabled {
   background: var(--bg-surface);
   border-color: var(--border);

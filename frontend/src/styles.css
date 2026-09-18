@@ -53,6 +53,7 @@
   --shadow-sm:     0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow:        0 12px 36px -4px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.03);
   --shadow-lg:     0 24px 48px -8px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-inner:  inset 0 1px 3px rgba(0, 0, 0, 0.4);
 
   /* ---- Typography ---- */
   --font-body:     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
