@@ -1,12 +1,15 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { apiUrl, request } from "../api/http";
+import ImageViewer from "../components/ImageViewer.vue";
 
 const loading = ref(false);
 const error = ref("");
 const items = ref([]);
 const nextCursor = ref(null);
 const selected = ref(null);
+const loadedMap = ref(new Map());
+const errorMap = ref(new Map());
 
 const groups = computed(() => {
   const byDate = new Map();
@@ -20,6 +23,14 @@ const groups = computed(() => {
 
 function imageUrl(item) {
   return apiUrl(item.url);
+}
+
+function handleImageLoad(path) {
+  loadedMap.value.set(path, true);
+}
+
+function handleImageError(path) {
+  errorMap.value.set(path, true);
 }
 
 async function loadGallery(append = false) {
@@ -46,7 +57,9 @@ function closeImage() {
   selected.value = null;
 }
 
-onMounted(loadGallery);
+onMounted(() => {
+  loadGallery();
+});
 </script>
 
 <template>
@@ -78,7 +91,19 @@ onMounted(loadGallery);
           :title="item.name"
           @click="openImage(item)"
         >
-          <img :src="imageUrl(item)" :alt="item.name" loading="lazy" />
+          <div class="image-wrapper">
+            <div v-if="!loadedMap.get(item.path) && !errorMap.get(item.path)" class="skeleton-placeholder"></div>
+            <div v-if="errorMap.get(item.path)" class="error-placeholder">加载失败</div>
+            <img
+              v-show="!errorMap.get(item.path)"
+              :src="imageUrl(item)"
+              :alt="item.name"
+              loading="lazy"
+              :class="{ loaded: loadedMap.get(item.path) }"
+              @load="handleImageLoad(item.path)"
+              @error="handleImageError(item.path)"
+            />
+          </div>
           <span>{{ item.name }}</span>
         </button>
       </div>
@@ -90,11 +115,13 @@ onMounted(loadGallery);
       </button>
     </div>
 
-    <div v-if="selected" class="preview-layer" role="dialog" aria-modal="true" :aria-label="selected.name" @click.self="closeImage">
-      <button class="preview-close" type="button" aria-label="关闭预览" @click="closeImage">×</button>
-      <img :src="imageUrl(selected)" :alt="selected.name" />
-      <p>{{ selected.path }}</p>
-    </div>
+    <ImageViewer
+      v-if="selected"
+      :url="imageUrl(selected)"
+      :alt="selected.name"
+      :subtitle="selected.path"
+      @close="closeImage"
+    />
   </main>
 </template>
 
@@ -110,13 +137,13 @@ onMounted(loadGallery);
 .image-tile { display: grid; min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--card); text-align: left; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: var(--shadow-sm); cursor: pointer; }
 .image-tile:hover { border-color: rgba(56, 189, 248, 0.4); background: var(--card-hover); transform: translateY(-2px); box-shadow: var(--shadow); }
 .image-tile:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.image-tile img { width: 100%; aspect-ratio: 1 / 1; display: block; object-fit: cover; background: #070a10; }
+.image-wrapper { position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; background: #070a10; }
+.skeleton-placeholder { position: absolute; inset: 0; background: linear-gradient(90deg, #111827 25%, #1f2937 50%, #111827 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.error-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); background: #111827; }
+.image-tile img { width: 100%; height: 100%; display: block; object-fit: cover; opacity: 0; transition: opacity 0.3s ease; }
+.image-tile img.loaded { opacity: 1; }
 .image-tile span { overflow: hidden; padding: 9px 12px; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .gallery-more { display: flex; justify-content: center; margin: 32px 0 16px; }
-.preview-layer { position: fixed; z-index: 50; inset: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 14px; padding: 32px; background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-.preview-layer img { min-width: 0; min-height: 0; width: 100%; height: 100%; object-fit: contain; }
-.preview-layer p { max-width: 100%; margin: 0; overflow: hidden; color: var(--muted); font-family: var(--font-mono); font-size: 12px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
-.preview-close { position: absolute; top: 18px; right: 20px; width: 38px; height: 38px; padding: 0; border: 1px solid var(--border-light); border-radius: 8px; background: rgba(22, 29, 43, 0.9); color: var(--text); font-size: 24px; line-height: 1; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
-.preview-close:hover { background: rgba(255, 255, 255, 0.12); color: #fff; transform: scale(1.05); }
-@media (max-width: 640px) { .external-gallery-page { padding: 18px; } .image-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; } .preview-layer { padding: 18px; } }
+@media (max-width: 640px) { .external-gallery-page { padding: 18px; } .image-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; } }
 </style>

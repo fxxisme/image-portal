@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { request } from "../api/http";
+import ChatSidebar from "../components/ChatSidebar.vue";
+import ImageViewer from "../components/ImageViewer.vue";
 import LoginModal from "../components/LoginModal.vue";
 import { useAuthStore } from "../stores/auth";
 import { formatChinaDateTime } from "../utils/datetime";
@@ -39,6 +41,9 @@ const currentId = ref(null);
 const messages = ref([]);
 const prompt = ref("");
 const sending = ref(false);
+const elapsedSeconds = ref(0);
+let timer = null;
+const lastFailedPrompt = ref("");
 const error = ref("");
 const editImageUrls = ref([]);
 const fileInput = ref(null);
@@ -295,6 +300,11 @@ async function send() {
   const apiKeyId = auth.me?.id || "anonymous";
 
   sending.value = true;
+  elapsedSeconds.value = 0;
+  if (timer) clearInterval(timer);
+  timer = setInterval(() => {
+    elapsedSeconds.value++;
+  }, 1000);
   error.value = "";
   try {
     const optimisticUserMsg = {
@@ -307,6 +317,7 @@ async function send() {
     localMessages.push(optimisticUserMsg);
     persistConversation(localConversationId, localMessages);
     prompt.value = "";
+    lastFailedPrompt.value = "";
     const refImages = [...editImageUrls.value];
     const requestModel = selectedModel.value || undefined;
     clearEditImage({ resetMode: false });
@@ -349,6 +360,7 @@ async function send() {
     await nextTick();
     if (currentId.value === localConversationId) scrollBottom();
   } catch (e) {
+    lastFailedPrompt.value = text;
     const detail = e.message || String(e);
     if (localMessages) {
       localMessages.push({
@@ -356,13 +368,24 @@ async function send() {
         role: "assistant",
         content: "❌ 生成失败\n\n" + detail,
         cost: 0,
+        failedPrompt: text,
       });
       persistConversation(localConversationId, localMessages);
     }
     error.value = e.message || String(e);
   } finally {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
     sending.value = false;
   }
+}
+
+function retryPrompt(textToRetry) {
+  if (!textToRetry || sending.value) return;
+  prompt.value = textToRetry;
+  send();
 }
 
 function logout() {
@@ -381,7 +404,13 @@ onMounted(async () => {
   scrollBottom();
 });
 
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+onBeforeUnmount(() => {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+  window.removeEventListener("keydown", onKeydown);
+});
 
 const showLoginModal = ref(false);
 
@@ -396,45 +425,13 @@ const handleLoginSuccess = async () => {
 
 <template>
   <div class="shell">
-    <aside class="sidebar">
-      <div class="side-top">
-        <div class="brand-lockup">
-          <span class="brand-mark" aria-hidden="true"><i /><i /><i /></span>
-          <div>
-            <div class="brand">VisionaryAI</div>
-            <div class="brand-caption">IMAGE WORKSPACE</div>
-          </div>
-        </div>
-      </div>
-
-      <button
-        class="primary new-chat-btn"
-        type="button"
-        title="新建对话"
-        aria-label="新建对话"
-        @click="createConversation"
-      >
-        <span class="new-chat-icon" aria-hidden="true">+</span>
-        <span class="new-chat-label">新建对话</span>
-      </button>
-
-      <div class="conv-list">
-        <div class="section-label">最近创作</div>
-        <button
-          v-for="c in conversations"
-          :key="c.id"
-          type="button"
-          class="conv-item"
-          :class="{ active: c.id === currentId }"
-          @click="selectConversation(c.id)"
-        >
-          <div class="conv-title">{{ c.title || "未命名" }}</div>
-          <div class="conv-meta muted">{{ formatChinaDateTime(c.updated_at) }}</div>
-          <span class="del" title="删除" @click.stop="removeConversation(c.id)">&times;</span>
-        </button>
-        <div v-if="!conversations.length" class="muted empty">暂无对话</div>
-      </div>
-    </aside>
+    <ChatSidebar
+      :conversations="conversations"
+      :current-id="currentId"
+      @select="selectConversation"
+      @create="createConversation"
+      @remove="removeConversation"
+    />
 
     <main class="main">
       <header class="bar glass-bar">
@@ -480,6 +477,11 @@ const handleLoginSuccess = async () => {
           <div class="bubble" :class="m.role">
             <div class="role-tag">{{ m.role === "user" ? "你" : "AI" }}</div>
             <div class="content">{{ m.content }}</div>
+            <div v-if="m.failedPrompt" class="retry-action-box">
+              <button class="retry-btn" type="button" :disabled="sending" @click="retryPrompt(m.failedPrompt)">
+                🔄 重新尝试此生图
+              </button>
+            </div>
 
             <div v-if="m.ref_image_url && m.role === 'user'" class="ref-thumb">
               <img :src="m.ref_image_url" alt="参考图" />
@@ -516,20 +518,19 @@ const handleLoginSuccess = async () => {
             <div class="generating-header">
               <span class="pulsing-orbit"></span>
               <span class="generating-title">AI 正在绘制画面...</span>
+              <span class="generating-timer">已等待 {{ elapsedSeconds }}s</span>
             </div>
             <div class="generating-skeleton shimmer"></div>
           </div>
         </div>
       </div>
 
-      <div v-if="previewImage" class="image-preview-modal" role="dialog" aria-modal="true" :aria-label="previewImage.alt" @click.self="closeImagePreview">
-        <button class="image-preview-close" type="button" title="关闭预览" aria-label="关闭预览" @click="closeImagePreview">&times;</button>
-        <img :src="previewImage.url" :alt="previewImage.alt" @error="retryImage" />
-        <div class="image-preview-actions">
-          <a :href="previewImage.url" target="_blank" rel="noopener">打开原图</a>
-          <a :href="previewImage.url" download="generated-image">下载</a>
-        </div>
-      </div>
+      <ImageViewer
+        v-if="previewImage"
+        :url="previewImage.url"
+        :alt="previewImage.alt"
+        @close="closeImagePreview"
+      />
 
       <div class="composer-area">
         <div class="composer-toolbar">
@@ -1139,6 +1140,36 @@ const handleLoginSuccess = async () => {
   font-weight: 500;
   color: var(--text-soft);
 }
+.generating-timer {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.retry-action-box {
+  margin-top: 10px;
+}
+.retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.retry-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.retry-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .generating-skeleton {
   width: 100%;
   aspect-ratio: 16 / 10;
@@ -1147,65 +1178,6 @@ const handleLoginSuccess = async () => {
   background: var(--bg-surface);
 }
 
-/* image preview modal */
-.image-preview-modal {
-  position: fixed;
-  z-index: 50;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 28px;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(10px);
-}
-.image-preview-modal > img {
-  max-width: min(1200px, 92vw);
-  max-height: 82vh;
-  object-fit: contain;
-  background: #000;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-}
-.image-preview-close {
-  position: absolute;
-  top: 16px;
-  right: 18px;
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  background: var(--bg-surface);
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.image-preview-close:hover {
-  background: var(--card-hover);
-  border-color: var(--border-light);
-}
-.image-preview-actions {
-  position: absolute;
-  bottom: 24px;
-  display: flex;
-  gap: 12px;
-}
-.image-preview-actions a {
-  padding: 8px 14px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  background: var(--bg-surface);
-  text-decoration: none;
-  font-size: 13px;
-}
-.image-preview-actions a:hover {
-  background: var(--card-hover);
-  border-color: var(--border-light);
-}
 .cost {
   margin-top: 8px;
   font-family: var(--font-mono);
@@ -1560,8 +1532,6 @@ const handleLoginSuccess = async () => {
   .mode-option { min-width: 72px; }
   .edit-banner { align-items: center; }
   .imgs.multiple-images { grid-template-columns: 1fr; }
-  .image-preview-modal { padding: 14px; }
-  .image-preview-modal > img { max-width: 100%; max-height: 78vh; }
 }
 
 @media (max-width: 360px) {
