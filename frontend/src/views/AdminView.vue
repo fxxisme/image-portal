@@ -857,11 +857,14 @@ onMounted(load);
 
 <style scoped>
 .layout {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 24px 16px 48px;
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 24px clamp(20px, 3.5vw, 48px) 48px;
   position: relative;
   background: var(--bg);
+  box-sizing: border-box;
 }
 
 /* top */
@@ -957,7 +960,7 @@ h2 {
 
 .settings-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
 }
 .settings-foot {
@@ -977,7 +980,7 @@ h2 {
 }
 .model-config-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 16px;
 }
 .model-config-group {
@@ -1060,8 +1063,8 @@ h2 {
 }
 .image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
 }
 .image-item {
   position: relative;
